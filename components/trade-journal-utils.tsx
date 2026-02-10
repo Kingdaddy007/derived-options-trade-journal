@@ -11,7 +11,12 @@ import { supabase } from "@/lib/supabaseClient";
 const STORAGE_KEY = "dozzy_trade_journal_v1";
 
 function uid() {
-    return Math.random().toString(16).slice(2) + "_" + Date.now().toString(16);
+    // Generate valid UUID v4 for Supabase compatibility
+    if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+        const r = (Math.random() * 16) | 0;
+        return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
+    });
 }
 
 function clampNum(n: unknown, fallback = 0) {
