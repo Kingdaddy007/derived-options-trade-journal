@@ -43,6 +43,7 @@ interface Strategy {
     id: string; name: string; summary: string; trigger: string; confirmation: string;
     riskRules: string; execution: string; avoid: string; examples: string; tags: string[];
     isTop: boolean; createdAtISO: string; updatedAtISO: string;
+    exampleImages: string[];
 }
 
 interface AppState { entries: TradeEntry[]; strategies: Strategy[]; settings: { currency: string }; }
@@ -61,6 +62,7 @@ function defaultState(): AppState {
             examples: "Write your best examples here.",
             tags: ["mean-reversion", "patience"], isTop: true,
             createdAtISO: toISO(Date.now()), updatedAtISO: toISO(Date.now()),
+            exampleImages: [],
         }],
         settings: { currency: "$" },
     };
@@ -110,6 +112,7 @@ function validateState(raw: any): AppState {
             tags: Array.isArray(s.tags) ? s.tags.map(String) : [], isTop: Boolean(s.isTop),
             createdAtISO: String(s.createdAtISO ?? toISO(Date.now())),
             updatedAtISO: String(s.updatedAtISO ?? toISO(Date.now())),
+            exampleImages: Array.isArray(s.exampleImages) ? s.exampleImages.filter((u: unknown) => typeof u === "string" && String(u).startsWith("http")) : [],
         })),
         settings: { currency: typeof settings.currency === "string" && settings.currency.length <= 4 ? settings.currency : "$" },
     };
@@ -142,7 +145,8 @@ function mapStrategyToDB(s: Strategy): any {
     return {
         id: s.id, name: s.name, summary: s.summary, trigger: s.trigger, confirmation: s.confirmation,
         risk_rules: s.riskRules, execution: s.execution, avoid: s.avoid, examples: s.examples, tags: s.tags,
-        is_top: s.isTop, created_at: s.createdAtISO, updated_at: s.updatedAtISO
+        is_top: s.isTop, created_at: s.createdAtISO, updated_at: s.updatedAtISO,
+        example_images: s.exampleImages || []
     };
 }
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -150,7 +154,8 @@ function mapDBToStrategy(d: any): Strategy {
     return {
         id: d.id, name: d.name, summary: d.summary, trigger: d.trigger, confirmation: d.confirmation,
         riskRules: d.risk_rules, execution: d.execution, avoid: d.avoid, examples: d.examples, tags: d.tags || [],
-        isTop: d.is_top, createdAtISO: d.created_at, updatedAtISO: d.updated_at
+        isTop: d.is_top, createdAtISO: d.created_at, updatedAtISO: d.updated_at,
+        exampleImages: d.example_images || []
     };
 }
 
@@ -262,6 +267,24 @@ function useSupabaseSync(): {
     return { state, loading, saveEntry, deleteEntry, saveStrategy, deleteStrategy, updateCurrency, wipeAll };
 }
 
+async function uploadStrategyImage(strategyId: string, file: File): Promise<string | null> {
+    const ext = file.name.split(".").pop() || "png";
+    const path = `${strategyId}/${Date.now()}_${Math.random().toString(16).slice(2, 8)}.${ext}`;
+    const { error } = await supabase.storage.from("strategy-examples").upload(path, file, { cacheControl: "3600", upsert: false });
+    if (error) { console.error("Upload error:", error); return null; }
+    const { data: urlData } = supabase.storage.from("strategy-examples").getPublicUrl(path);
+    return urlData?.publicUrl || null;
+}
+
+async function deleteStrategyImage(url: string): Promise<void> {
+    // Extract path from public URL
+    const marker = "/storage/v1/object/public/strategy-examples/";
+    const idx = url.indexOf(marker);
+    if (idx === -1) return;
+    const path = decodeURIComponent(url.slice(idx + marker.length));
+    await supabase.storage.from("strategy-examples").remove([path]);
+}
+
 function splitTags(raw: string) { return raw.split(",").map((t) => t.trim()).filter(Boolean).slice(0, 20); }
 function statColorClass(n: number) { if (n > 0) return "text-emerald-600"; if (n < 0) return "text-rose-600"; return "text-slate-600"; }
 function Pill({ children }: { children: React.ReactNode }) { return <span className="px-2 py-1 rounded-full text-xs bg-slate-100 text-slate-700 border border-slate-200">{children}</span>; }
@@ -344,5 +367,5 @@ function StatsStrip({ entries, currency }: { entries: TradeEntry[]; currency: st
     </div>);
 }
 
-export { uid, clampNum, toISO, formatMoney, splitTags, statColorClass, Pill, Stars, StarPicker, EmptyState, FileButton, smallDate, outcomeFromProfit, computeProfit, TopBar, StatsStrip, useSupabaseSync, defaultState, safeParseJSON, validateState, STORAGE_KEY };
+export { uid, clampNum, toISO, formatMoney, splitTags, statColorClass, Pill, Stars, StarPicker, EmptyState, FileButton, smallDate, outcomeFromProfit, computeProfit, TopBar, StatsStrip, useSupabaseSync, defaultState, safeParseJSON, validateState, STORAGE_KEY, uploadStrategyImage, deleteStrategyImage };
 export type { TradeEntry, Strategy, AppState, TradeScreenshot };

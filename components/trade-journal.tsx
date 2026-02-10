@@ -16,11 +16,11 @@ import { Search, Plus, TrendingUp, BookOpen, Copy, Loader2, CloudCheck, CloudOff
 import {
     uid, clampNum, toISO, formatMoney, splitTags, statColorClass, Pill,
     EmptyState, FileButton, smallDate, outcomeFromProfit, computeProfit, TopBar, StatsStrip, useSupabaseSync,
-    defaultState, validateState, safeParseJSON, Stars, StarPicker
+    defaultState, validateState, safeParseJSON, Stars, StarPicker, uploadStrategyImage, deleteStrategyImage
 } from "@/components/trade-journal-utils";
 import type { TradeEntry, Strategy, TradeScreenshot } from "@/components/trade-journal-utils";
 import { useEffect } from "react";
-import { Upload, X } from "lucide-react";
+import { Upload, X, ImagePlus, Loader2 as ImageLoader } from "lucide-react";
 
 function EntryForm({ strategies, currency, initial, onSave, onCancel }: {
     strategies: Strategy[]; currency: string; initial: TradeEntry | null; onSave: (e: TradeEntry) => void; onCancel: () => void;
@@ -157,12 +157,31 @@ function StrategyForm({ initial, onSave, onCancel }: { initial: Strategy | null;
     const [examples, setExamples] = useState(initial?.examples ?? "");
     const [tagsRaw, setTagsRaw] = useState((initial?.tags ?? []).join(", "));
     const [isTop, setIsTop] = useState(Boolean(initial?.isTop));
+    const [exampleImages, setExampleImages] = useState<string[]>(initial?.exampleImages ?? []);
+    const [uploading, setUploading] = useState(false);
+    const strategyId = initial?.id ?? uid();
+
+    const handleImageUpload = async (file: File) => {
+        if (!file.type.startsWith("image/")) return;
+        if (file.size > 5 * 1024 * 1024) { alert("Image too large. Max 5MB."); return; }
+        if (exampleImages.length >= 3) { alert("Max 3 images per strategy."); return; }
+        setUploading(true);
+        const url = await uploadStrategyImage(strategyId, file);
+        if (url) setExampleImages((prev) => [...prev, url]);
+        setUploading(false);
+    };
+
+    const handleImageRemove = async (url: string) => {
+        setExampleImages((prev) => prev.filter((u) => u !== url));
+        await deleteStrategyImage(url);
+    };
 
     const save = () => {
         const s: Strategy = {
-            id: initial?.id ?? uid(), name: name.trim() || "Untitled strategy", summary, trigger, confirmation,
+            id: strategyId, name: name.trim() || "Untitled strategy", summary, trigger, confirmation,
             riskRules, execution, avoid, examples, tags: splitTags(tagsRaw), isTop,
             createdAtISO: initial?.createdAtISO ?? toISO(Date.now()), updatedAtISO: toISO(Date.now()),
+            exampleImages,
         };
         onSave(s);
     };
@@ -186,12 +205,34 @@ function StrategyForm({ initial, onSave, onCancel }: { initial: Strategy | null;
             </div>
             <div className="grid md:grid-cols-2 gap-3">
                 <div className="grid gap-2"><Label>Avoid conditions</Label><Textarea value={avoid} onChange={(e) => setAvoid(e.target.value)} placeholder="When NOT to trade this." className="min-h-[110px]" /></div>
-                <div className="grid gap-2"><Label>Best examples</Label><Textarea value={examples} onChange={(e) => setExamples(e.target.value)} placeholder="Paste the clearest examples from your journal." className="min-h-[110px]" /></div>
+                <div className="grid gap-2"><Label>Best examples (notes)</Label><Textarea value={examples} onChange={(e) => setExamples(e.target.value)} placeholder="Paste the clearest examples from your journal." className="min-h-[110px]" /></div>
+            </div>
+            <div className="grid gap-2">
+                <div className="flex items-center justify-between">
+                    <Label>Example Screenshots ({exampleImages.length}/3)</Label>
+                    {exampleImages.length < 3 && (
+                        <FileButton accept="image/*" onFile={handleImageUpload}>
+                            <span className="inline-flex items-center gap-2">{uploading ? <ImageLoader className="w-4 h-4 animate-spin" /> : <ImagePlus className="w-4 h-4" />}{uploading ? "Uploading..." : "Add image"}</span>
+                        </FileButton>
+                    )}
+                </div>
+                {exampleImages.length > 0 ? (
+                    <div className="grid grid-cols-3 gap-3">
+                        {exampleImages.map((url) => (
+                            <div key={url} className="relative rounded-2xl overflow-hidden border border-slate-200 bg-white">
+                                <img src={url} alt="Example" className="w-full h-32 object-cover" />
+                                <button className="absolute top-2 right-2 bg-white/90 border border-slate-200 rounded-full p-1" onClick={() => handleImageRemove(url)} title="Remove"><X className="w-4 h-4" /></button>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="text-sm text-slate-500 rounded-2xl border border-dashed border-slate-300 p-4 text-center">No example screenshots yet. Upload chart images to remember what this strategy looks like.</div>
+                )}
             </div>
             <div className="grid gap-2"><Label>Tags (comma separated)</Label><Input value={tagsRaw} onChange={(e) => setTagsRaw(e.target.value)} placeholder="e.g. timing, ticks, trend, reversal" /></div>
             <DialogFooter className="gap-2 sticky bottom-0 bg-white pt-3 border-t border-slate-200">
                 <Button variant="outline" onClick={onCancel}>Cancel</Button>
-                <Button onClick={save}>{isEdit ? "Update strategy" : "Save strategy"}</Button>
+                <Button onClick={save} disabled={uploading}>{isEdit ? "Update strategy" : "Save strategy"}</Button>
             </DialogFooter>
         </div>
     );
@@ -252,6 +293,14 @@ function StrategyCard({ s, linkedTradesCount, onEdit, onDelete, onDuplicate, onT
                     <div className="rounded-xl bg-slate-50 border border-slate-200 p-3"><div className="text-xs font-medium text-slate-700">Trigger</div><div className="text-sm text-slate-700 mt-1 whitespace-pre-wrap">{s.trigger || <span className="text-slate-400">—</span>}</div></div>
                     <div className="rounded-xl bg-slate-50 border border-slate-200 p-3"><div className="text-xs font-medium text-slate-700">Confirmation</div><div className="text-sm text-slate-700 mt-1 whitespace-pre-wrap">{s.confirmation || <span className="text-slate-400">—</span>}</div></div>
                 </div>
+                {s.exampleImages?.length ? (
+                    <div>
+                        <div className="text-xs font-medium text-slate-700 mb-2">Example Screenshots</div>
+                        <div className="flex gap-2 overflow-x-auto pb-2">
+                            {s.exampleImages.map((url) => (<img key={url} src={url} alt="Example" className="h-24 w-36 object-cover rounded-xl border border-slate-200 cursor-pointer hover:opacity-80 transition" onClick={() => window.open(url, "_blank")} />))}
+                        </div>
+                    </div>
+                ) : null}
                 {s.tags?.length ? <div className="flex flex-wrap gap-2">{s.tags.map((t) => (<span key={t} className="text-xs px-2 py-1 rounded-full bg-white border border-slate-200 text-slate-700">#{t}</span>))}</div> : null}
                 <Separator />
                 <div className="flex flex-wrap gap-2">
@@ -311,7 +360,7 @@ export default function TradeJournal() {
     const handleDeleteStrategy = async (id: string) => {
         await deleteStrategy(id);
     };
-    const duplicateStrategy = (s: Strategy) => { const copy = { ...s, id: uid(), name: `${s.name} (copy)`, createdAtISO: toISO(Date.now()), updatedAtISO: toISO(Date.now()) }; handleSaveStrategy(copy); };
+    const duplicateStrategy = (s: Strategy) => { const copy = { ...s, id: uid(), name: `${s.name} (copy)`, exampleImages: [...(s.exampleImages || [])], createdAtISO: toISO(Date.now()), updatedAtISO: toISO(Date.now()) }; handleSaveStrategy(copy); };
     const toggleTopStrategy = (id: string) => {
         const s = strategies.find((x) => x.id === id);
         if (s) handleSaveStrategy({ ...s, isTop: !s.isTop, updatedAtISO: toISO(Date.now()) });
