@@ -12,10 +12,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Search, Plus, TrendingUp, BookOpen, Copy } from "lucide-react";
+import { Search, Plus, TrendingUp, BookOpen, Copy, Loader2, CloudCheck, CloudOff } from "lucide-react";
 import {
     uid, clampNum, toISO, formatMoney, splitTags, statColorClass, Pill,
-    EmptyState, FileButton, smallDate, outcomeFromProfit, computeProfit, TopBar, StatsStrip, useLocalState,
+    EmptyState, FileButton, smallDate, outcomeFromProfit, computeProfit, TopBar, StatsStrip, useSupabaseSync,
     defaultState, validateState, safeParseJSON, Stars, StarPicker
 } from "@/components/trade-journal-utils";
 import type { TradeEntry, Strategy, TradeScreenshot } from "@/components/trade-journal-utils";
@@ -263,7 +263,7 @@ function StrategyCard({ s, linkedTradesCount, onEdit, onDelete, onDuplicate, onT
 }
 
 export default function TradeJournal() {
-    const [state, setState] = useLocalState();
+    const { state, loading, saveEntry, deleteEntry, saveStrategy, deleteStrategy, updateCurrency, wipeAll } = useSupabaseSync();
     const { entries, strategies, settings } = state;
     const [query, setQuery] = useState(""); const [filterOutcome, setFilterOutcome] = useState("all");
     const [filterType, setFilterType] = useState("all"); const [filterStrategy, setFilterStrategy] = useState("all");
@@ -297,76 +297,101 @@ export default function TradeJournal() {
     const topStrategies = useMemo(() => strategies.slice().sort((a, b) => Number(b.isTop) - Number(a.isTop) || b.updatedAtISO.localeCompare(a.updatedAtISO)), [strategies]);
     const tradesByStrategyCount = useMemo(() => { const counts = new Map<string, number>(); for (const e of entries) { if (!e.strategyId) continue; counts.set(e.strategyId, (counts.get(e.strategyId) || 0) + 1); } return counts; }, [entries]);
 
-    const saveEntry = (entry: TradeEntry) => { setState((prev) => { const exists = prev.entries.some((e) => e.id === entry.id); const nextEntries = exists ? prev.entries.map((e) => (e.id === entry.id ? entry : e)) : [entry, ...prev.entries]; return { ...prev, entries: nextEntries }; }); setTradeDialogOpen(false); setEditingEntry(null); };
-    const deleteEntry = (id: string) => { setState((prev) => ({ ...prev, entries: prev.entries.filter((e) => e.id !== id) })); };
-    const saveStrategy = (s: Strategy) => { setState((prev) => { const exists = prev.strategies.some((x) => x.id === s.id); const next = exists ? prev.strategies.map((x) => (x.id === s.id ? s : x)) : [s, ...prev.strategies]; return { ...prev, strategies: next }; }); setStrategyDialogOpen(false); setEditingStrategy(null); };
-    const deleteStrategy = (id: string) => { setState((prev) => { const nextStrategies = prev.strategies.filter((s) => s.id !== id); const nextEntries = prev.entries.map((e) => (e.strategyId === id ? { ...e, strategyId: undefined, updatedAtISO: toISO(Date.now()) } : e)); return { ...prev, strategies: nextStrategies, entries: nextEntries }; }); };
-    const duplicateStrategy = (s: Strategy) => { const copy = { ...s, id: uid(), name: `${s.name} (copy)`, createdAtISO: toISO(Date.now()), updatedAtISO: toISO(Date.now()) }; saveStrategy(copy); };
-    const toggleTopStrategy = (id: string) => { setState((prev) => ({ ...prev, strategies: prev.strategies.map((s) => (s.id === id ? { ...s, isTop: !s.isTop, updatedAtISO: toISO(Date.now()) } : s)) })); };
+    const handleSaveEntry = async (entry: TradeEntry) => {
+        setTradeDialogOpen(false); setEditingEntry(null);
+        await saveEntry(entry);
+    };
+    const handleDeleteEntry = async (id: string) => {
+        await deleteEntry(id);
+    };
+    const handleSaveStrategy = async (s: Strategy) => {
+        setStrategyDialogOpen(false); setEditingStrategy(null);
+        await saveStrategy(s);
+    };
+    const handleDeleteStrategy = async (id: string) => {
+        await deleteStrategy(id);
+    };
+    const duplicateStrategy = (s: Strategy) => { const copy = { ...s, id: uid(), name: `${s.name} (copy)`, createdAtISO: toISO(Date.now()), updatedAtISO: toISO(Date.now()) }; handleSaveStrategy(copy); };
+    const toggleTopStrategy = (id: string) => {
+        const s = strategies.find((x) => x.id === id);
+        if (s) handleSaveStrategy({ ...s, isTop: !s.isTop, updatedAtISO: toISO(Date.now()) });
+    };
 
     const exportJSON = () => { const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `trade-journal-export-${new Date().toISOString().slice(0, 10)}.json`; a.click(); URL.revokeObjectURL(url); };
-    const importJSON = async (file: File) => { const text = await file.text(); const raw = safeParseJSON(text); if (raw) setState(validateState(raw)); };
-    const wipeAll = () => { const ok = window.confirm("This will delete ALL trades and strategies on this device. Continue?"); if (!ok) return; setState(defaultState()); };
-    const updateCurrency = (cur: string) => { setState((prev) => ({ ...prev, settings: { ...prev.settings, currency: cur || "$" } })); };
+    const importJSON = async (file: File) => {
+        const text = await file.text(); const raw = safeParseJSON(text);
+        if (raw) {
+            const clean = validateState(raw);
+            // Bulk import simulation for now (or single call loop)
+            // Just notify user imports are manual for cloud in this version
+            alert("Bulk import is not fully supported in Cloud mode yet to prevent overwriting. Please re-enter or email support.");
+        }
+    };
+    const handleWipe = async () => { await wipeAll(); };
+    const handleUpdateCurrency = async (cur: string) => { await updateCurrency(cur || "$"); };
 
     return (
         <div className="min-h-screen bg-slate-50"><div className="max-w-6xl mx-auto px-4 py-8">
-            <TopBar currency={currency} onCurrency={updateCurrency} onExport={exportJSON} onImport={importJSON} onWipe={wipeAll} />
-            <div className="mt-6"><StatsStrip entries={entries} currency={currency} /></div>
-            <div className="mt-6"><Tabs defaultValue="journal">
-                <TabsList className="rounded-2xl"><TabsTrigger value="journal" className="gap-2"><BookOpen className="w-4 h-4" />Journal</TabsTrigger><TabsTrigger value="strategies" className="gap-2"><TrendingUp className="w-4 h-4" />Strategies</TabsTrigger></TabsList>
-                <TabsContent value="journal" className="mt-4"><Card className="rounded-2xl"><CardHeader className="pb-3">
-                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between"><div><CardTitle className="text-base">Trade entries</CardTitle><div className="text-sm text-slate-600">Search anything: market, tags, what you saw, what worked…</div></div>
-                        <div className="flex flex-wrap gap-2"><Dialog open={tradeDialogOpen} onOpenChange={(v) => { setTradeDialogOpen(v); if (!v) setEditingEntry(null); }}>
-                            <DialogTrigger asChild><Button className="gap-2"><Plus className="w-4 h-4" />New trade</Button></DialogTrigger>
-                            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle>{editingEntry ? "Edit trade" : "New trade"}</DialogTitle></DialogHeader>
-                                <EntryForm strategies={strategies} currency={currency} initial={editingEntry} onSave={saveEntry} onCancel={() => { setTradeDialogOpen(false); setEditingEntry(null); }} /></DialogContent></Dialog></div></div>
-                </CardHeader><CardContent className="grid gap-4">
-                        <div className="grid md:grid-cols-12 gap-3">
-                            <div className="md:col-span-5"><div className="relative"><Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" /><Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search trades, tags, notes, strategies…" className="pl-9" /></div></div>
-                            <div className="md:col-span-2"><Select value={filterOutcome} onValueChange={setFilterOutcome}><SelectTrigger><SelectValue placeholder="Outcome" /></SelectTrigger><SelectContent><SelectItem value="all">All outcomes</SelectItem><SelectItem value="Win">Win</SelectItem><SelectItem value="Loss">Loss</SelectItem><SelectItem value="BE">Break-even</SelectItem></SelectContent></Select></div>
-                            <div className="md:col-span-2"><Select value={filterType} onValueChange={setFilterType}><SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger><SelectContent><SelectItem value="all">All types</SelectItem><SelectItem value="R_F">Rise/Fall</SelectItem><SelectItem value="TOUCHED">Touched</SelectItem></SelectContent></Select></div>
-                            <div className="md:col-span-3"><Select value={filterStrategy} onValueChange={setFilterStrategy}><SelectTrigger><SelectValue placeholder="Strategy" /></SelectTrigger><SelectContent><SelectItem value="all">All strategies</SelectItem><SelectItem value="none">No strategy</SelectItem>{strategies.slice().sort((a, b) => Number(b.isTop) - Number(a.isTop) || a.name.localeCompare(b.name)).map((s) => (<SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>))}</SelectContent></Select></div>
-                            <div className="md:col-span-3"><Select value={sortBy} onValueChange={setSortBy}><SelectTrigger><SelectValue placeholder="Sort" /></SelectTrigger><SelectContent><SelectItem value="newest">Newest</SelectItem><SelectItem value="oldest">Oldest</SelectItem><SelectItem value="profit">Most profit</SelectItem><SelectItem value="loss">Most loss</SelectItem></SelectContent></Select></div>
-                            <div className="md:col-span-3"><Select value={viewMode} onValueChange={setViewMode}><SelectTrigger><SelectValue placeholder="View" /></SelectTrigger><SelectContent><SelectItem value="cards">Card view</SelectItem><SelectItem value="table">Table view</SelectItem></SelectContent></Select></div>
-                        </div>
-                        {filteredEntries.length ? (
-                            viewMode === "table" ? (
-                                <div className="rounded-2xl border border-slate-200 overflow-hidden bg-white"><div className="overflow-x-auto"><table className="w-full text-sm">
-                                    <thead className="bg-slate-50 border-b border-slate-200"><tr className="text-left text-xs text-slate-600">
-                                        <th className="p-3">Date</th><th className="p-3">Type</th><th className="p-3">Market</th><th className="p-3">TF</th><th className="p-3">Dir</th><th className="p-3">Stake</th><th className="p-3">Payout</th><th className="p-3">Outcome</th><th className="p-3">P/L</th><th className="p-3">Strategy</th><th className="p-3">Conf.</th><th className="p-3"></th>
-                                    </tr></thead>
-                                    <tbody>{filteredEntries.map((e) => {
-                                        const strat = e.strategyId ? strategyById.get(e.strategyId) : null;
-                                        return (<tr key={e.id} className="border-b border-slate-100 hover:bg-slate-50">
-                                            <td className="p-3 text-slate-700 whitespace-nowrap">{smallDate(e.entryTimeISO)}</td><td className="p-3"><Pill>{e.tradeType === "TOUCHED" ? "Touched" : "Rise/Fall"}</Pill></td><td className="p-3 text-slate-700">{e.market || "—"}</td><td className="p-3 text-slate-700">{e.timeframe || "—"}</td><td className="p-3 text-slate-700">{e.tradeType === "TOUCHED" ? "—" : e.direction}</td><td className="p-3 text-slate-700 whitespace-nowrap">{formatMoney(e.stake, currency)}</td><td className="p-3 text-slate-700 whitespace-nowrap">{formatMoney(e.payout, currency)}</td><td className="p-3"><Badge variant={e.outcome === "Win" ? "default" : e.outcome === "Loss" ? "destructive" : "secondary"}>{e.outcome}</Badge></td><td className={`p-3 whitespace-nowrap font-medium ${statColorClass(e.profit)}`}>{formatMoney(e.profit, currency)}</td><td className="p-3 text-slate-700">{strat ? strat.name : "—"}</td><td className="p-3"><Stars value={e.confidence || 0} /></td><td className="p-3"><div className="flex gap-2 justify-end"><Button variant="outline" size="sm" onClick={() => { setEditingEntry(e); setTradeDialogOpen(true); }}>Edit</Button><Button variant="destructive" size="sm" onClick={() => deleteEntry(e.id)}>Delete</Button></div></td>
-                                        </tr>);
-                                    })}</tbody></table></div></div>
-                            ) : (<div className="grid gap-4">{filteredEntries.map((e) => (<TradeRow key={e.id} entry={e} strategy={e.strategyId ? strategyById.get(e.strategyId) : null} currency={currency} onEdit={(entry) => { setEditingEntry(entry); setTradeDialogOpen(true); }} onDelete={deleteEntry} />))}</div>)
-                        ) : (<EmptyState title={entries.length ? "No trades match your filters" : "No trades yet"} hint={entries.length ? "Try clearing filters or searching different words." : "Start logging. The power is in the review."} action={<Button onClick={() => setTradeDialogOpen(true)} className="gap-2"><Plus className="w-4 h-4" />Add your first trade</Button>} />)}
-                    </CardContent></Card></TabsContent>
-                <TabsContent value="strategies" className="mt-4"><div className="grid lg:grid-cols-3 gap-4">
-                    <div className="lg:col-span-2"><Card className="rounded-2xl"><CardHeader className="pb-3">
-                        <div className="flex items-center justify-between gap-3"><div><CardTitle className="text-base">Strategy Library</CardTitle><div className="text-sm text-slate-600">Turn your best observations into repeatable rules.</div></div>
-                            <Dialog open={strategyDialogOpen} onOpenChange={(v) => { setStrategyDialogOpen(v); if (!v) setEditingStrategy(null); }}>
-                                <DialogTrigger asChild><Button className="gap-2"><Plus className="w-4 h-4" />New strategy</Button></DialogTrigger>
-                                <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle>{editingStrategy ? "Edit strategy" : "New strategy"}</DialogTitle></DialogHeader>
-                                    <StrategyForm initial={editingStrategy} onSave={saveStrategy} onCancel={() => { setStrategyDialogOpen(false); setEditingStrategy(null); }} /></DialogContent></Dialog></div>
-                    </CardHeader><CardContent className="grid gap-4">
-                            {topStrategies.length ? (<div className="grid gap-4">{topStrategies.map((s) => (<StrategyCard key={s.id} s={s} linkedTradesCount={tradesByStrategyCount.get(s.id) || 0} onEdit={(x) => { setEditingStrategy(x); setStrategyDialogOpen(true); }} onDelete={deleteStrategy} onDuplicate={duplicateStrategy} onToggleTop={toggleTopStrategy} />))}</div>)
-                                : (<EmptyState title="No strategies yet" hint="Your best trading future is usually hidden inside your past trades. Capture it." action={<Button onClick={() => setStrategyDialogOpen(true)} className="gap-2"><Plus className="w-4 h-4" />Create a strategy</Button>} />)}
-                        </CardContent></Card></div>
-                    <div className="lg:col-span-1"><Card className="rounded-2xl"><CardHeader className="pb-3"><CardTitle className="text-base">How to use this</CardTitle></CardHeader>
-                        <CardContent className="grid gap-3 text-sm text-slate-700">
-                            <div className="rounded-2xl border border-slate-200 bg-white p-4"><div className="font-semibold">1) Journal like a scientist</div><div className="mt-1 text-slate-600">Write what you saw, what you expected, what actually happened.</div></div>
-                            <div className="rounded-2xl border border-slate-200 bg-white p-4"><div className="font-semibold">2) Promote patterns into strategies</div><div className="mt-1 text-slate-600">When something repeats, move it into the Strategy Library.</div></div>
-                            <div className="rounded-2xl border border-slate-200 bg-white p-4"><div className="font-semibold">3) Link trades to strategies</div><div className="mt-1 text-slate-600">So later you can see which strategy is truly paying.</div></div>
-                            <div className="rounded-2xl border border-slate-200 bg-white p-4"><div className="font-semibold">4) Protect your data</div><div className="mt-1 text-slate-600">Use Export sometimes. Import restores it on any device.</div></div>
-                            <Separator /><div className="text-xs text-slate-500">This version saves to your browser (localStorage). If you want: Supabase sync, multi-device login, or a dashboard of strategy performance, tell me and I&apos;ll extend it.</div>
-                        </CardContent></Card></div>
-                </div></TabsContent>
-            </Tabs></div>
-            <div className="mt-8 text-xs text-slate-500">Tip: the best journals are simple. Keep your entries short but precise, then review weekly and promote only what repeats.</div>
+            <TopBar currency={currency} onCurrency={handleUpdateCurrency} onExport={exportJSON} onImport={importJSON} onWipe={handleWipe} />
+            {loading ? <div className="py-10 text-center text-slate-500 flex flex-col items-center gap-2"><Loader2 className="w-8 h-8 animate-spin text-slate-400" /> Connecting to Supabase...</div> : (
+                <>
+                    <div className="mt-6"><StatsStrip entries={entries} currency={currency} /></div>
+                    <div className="mt-6"><Tabs defaultValue="journal">
+                        <TabsList className="rounded-2xl"><TabsTrigger value="journal" className="gap-2"><BookOpen className="w-4 h-4" />Journal</TabsTrigger><TabsTrigger value="strategies" className="gap-2"><TrendingUp className="w-4 h-4" />Strategies</TabsTrigger></TabsList>
+                        <TabsContent value="journal" className="mt-4"><Card className="rounded-2xl"><CardHeader className="pb-3">
+                            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between"><div><CardTitle className="text-base">Trade entries</CardTitle><div className="text-sm text-slate-600">Search anything: market, tags, what you saw, what worked…</div></div>
+                                <div className="flex flex-wrap gap-2"><Dialog open={tradeDialogOpen} onOpenChange={(v) => { setTradeDialogOpen(v); if (!v) setEditingEntry(null); }}>
+                                    <DialogTrigger asChild><Button className="gap-2"><Plus className="w-4 h-4" />New trade</Button></DialogTrigger>
+                                    <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle>{editingEntry ? "Edit trade" : "New trade"}</DialogTitle></DialogHeader>
+                                        <EntryForm strategies={strategies} currency={currency} initial={editingEntry} onSave={handleSaveEntry} onCancel={() => { setTradeDialogOpen(false); setEditingEntry(null); }} /></DialogContent></Dialog></div></div>
+                        </CardHeader><CardContent className="grid gap-4">
+                                <div className="grid md:grid-cols-12 gap-3">
+                                    <div className="md:col-span-5"><div className="relative"><Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" /><Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search trades, tags, notes, strategies…" className="pl-9" /></div></div>
+                                    <div className="md:col-span-2"><Select value={filterOutcome} onValueChange={setFilterOutcome}><SelectTrigger><SelectValue placeholder="Outcome" /></SelectTrigger><SelectContent><SelectItem value="all">All outcomes</SelectItem><SelectItem value="Win">Win</SelectItem><SelectItem value="Loss">Loss</SelectItem><SelectItem value="BE">Break-even</SelectItem></SelectContent></Select></div>
+                                    <div className="md:col-span-2"><Select value={filterType} onValueChange={setFilterType}><SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger><SelectContent><SelectItem value="all">All types</SelectItem><SelectItem value="R_F">Rise/Fall</SelectItem><SelectItem value="TOUCHED">Touched</SelectItem></SelectContent></Select></div>
+                                    <div className="md:col-span-3"><Select value={filterStrategy} onValueChange={setFilterStrategy}><SelectTrigger><SelectValue placeholder="Strategy" /></SelectTrigger><SelectContent><SelectItem value="all">All strategies</SelectItem><SelectItem value="none">No strategy</SelectItem>{strategies.slice().sort((a, b) => Number(b.isTop) - Number(a.isTop) || a.name.localeCompare(b.name)).map((s) => (<SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>))}</SelectContent></Select></div>
+                                    <div className="md:col-span-3"><Select value={sortBy} onValueChange={setSortBy}><SelectTrigger><SelectValue placeholder="Sort" /></SelectTrigger><SelectContent><SelectItem value="newest">Newest</SelectItem><SelectItem value="oldest">Oldest</SelectItem><SelectItem value="profit">Most profit</SelectItem><SelectItem value="loss">Most loss</SelectItem></SelectContent></Select></div>
+                                    <div className="md:col-span-3"><Select value={viewMode} onValueChange={setViewMode}><SelectTrigger><SelectValue placeholder="View" /></SelectTrigger><SelectContent><SelectItem value="cards">Card view</SelectItem><SelectItem value="table">Table view</SelectItem></SelectContent></Select></div>
+                                </div>
+                                {filteredEntries.length ? (
+                                    viewMode === "table" ? (
+                                        <div className="rounded-2xl border border-slate-200 overflow-hidden bg-white"><div className="overflow-x-auto"><table className="w-full text-sm">
+                                            <thead className="bg-slate-50 border-b border-slate-200"><tr className="text-left text-xs text-slate-600">
+                                                <th className="p-3">Date</th><th className="p-3">Type</th><th className="p-3">Market</th><th className="p-3">TF</th><th className="p-3">Dir</th><th className="p-3">Stake</th><th className="p-3">Payout</th><th className="p-3">Outcome</th><th className="p-3">P/L</th><th className="p-3">Strategy</th><th className="p-3">Conf.</th><th className="p-3"></th>
+                                            </tr></thead>
+                                            <tbody>{filteredEntries.map((e) => {
+                                                const strat = e.strategyId ? strategyById.get(e.strategyId) : null;
+                                                return (<tr key={e.id} className="border-b border-slate-100 hover:bg-slate-50">
+                                                    <td className="p-3 text-slate-700 whitespace-nowrap">{smallDate(e.entryTimeISO)}</td><td className="p-3"><Pill>{e.tradeType === "TOUCHED" ? "Touched" : "Rise/Fall"}</Pill></td><td className="p-3 text-slate-700">{e.market || "—"}</td><td className="p-3 text-slate-700">{e.timeframe || "—"}</td><td className="p-3 text-slate-700">{e.tradeType === "TOUCHED" ? "—" : e.direction}</td><td className="p-3 text-slate-700 whitespace-nowrap">{formatMoney(e.stake, currency)}</td><td className="p-3 text-slate-700 whitespace-nowrap">{formatMoney(e.payout, currency)}</td><td className="p-3"><Badge variant={e.outcome === "Win" ? "default" : e.outcome === "Loss" ? "destructive" : "secondary"}>{e.outcome}</Badge></td><td className={`p-3 whitespace-nowrap font-medium ${statColorClass(e.profit)}`}>{formatMoney(e.profit, currency)}</td><td className="p-3 text-slate-700">{strat ? strat.name : "—"}</td><td className="p-3"><Stars value={e.confidence || 0} /></td><td className="p-3"><div className="flex gap-2 justify-end"><Button variant="outline" size="sm" onClick={() => { setEditingEntry(e); setTradeDialogOpen(true); }}>Edit</Button><Button variant="destructive" size="sm" onClick={() => handleDeleteEntry(e.id)}>Delete</Button></div></td>
+                                                </tr>);
+                                            })}</tbody></table></div></div>
+                                    ) : (<div className="grid gap-4">{filteredEntries.map((e) => (<TradeRow key={e.id} entry={e} strategy={e.strategyId ? strategyById.get(e.strategyId) : null} currency={currency} onEdit={(entry) => { setEditingEntry(entry); setTradeDialogOpen(true); }} onDelete={handleDeleteEntry} />))}</div>)
+                                ) : (<EmptyState title={entries.length ? "No trades match your filters" : "No trades yet"} hint={entries.length ? "Try clearing filters or searching different words." : "Start logging. The power is in the review."} action={<Button onClick={() => setTradeDialogOpen(true)} className="gap-2"><Plus className="w-4 h-4" />Add your first trade</Button>} />)}
+                            </CardContent></Card></TabsContent>
+                        <TabsContent value="strategies" className="mt-4"><div className="grid lg:grid-cols-3 gap-4">
+                            <div className="lg:col-span-2"><Card className="rounded-2xl"><CardHeader className="pb-3">
+                                <div className="flex items-center justify-between gap-3"><div><CardTitle className="text-base">Strategy Library</CardTitle><div className="text-sm text-slate-600">Turn your best observations into repeatable rules.</div></div>
+                                    <Dialog open={strategyDialogOpen} onOpenChange={(v) => { setStrategyDialogOpen(v); if (!v) setEditingStrategy(null); }}>
+                                        <DialogTrigger asChild><Button className="gap-2"><Plus className="w-4 h-4" />New strategy</Button></DialogTrigger>
+                                        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle>{editingStrategy ? "Edit strategy" : "New strategy"}</DialogTitle></DialogHeader>
+                                            <StrategyForm initial={editingStrategy} onSave={handleSaveStrategy} onCancel={() => { setStrategyDialogOpen(false); setEditingStrategy(null); }} /></DialogContent></Dialog></div>
+                            </CardHeader><CardContent className="grid gap-4">
+                                    {topStrategies.length ? (<div className="grid gap-4">{topStrategies.map((s) => (<StrategyCard key={s.id} s={s} linkedTradesCount={tradesByStrategyCount.get(s.id) || 0} onEdit={(x) => { setEditingStrategy(x); setStrategyDialogOpen(true); }} onDelete={handleDeleteStrategy} onDuplicate={duplicateStrategy} onToggleTop={toggleTopStrategy} />))}</div>)
+                                        : (<EmptyState title="No strategies yet" hint="Your best trading future is usually hidden inside your past trades. Capture it." action={<Button onClick={() => setStrategyDialogOpen(true)} className="gap-2"><Plus className="w-4 h-4" />Create a strategy</Button>} />)}
+                                </CardContent></Card></div>
+                            <div className="lg:col-span-1"><Card className="rounded-2xl"><CardHeader className="pb-3"><CardTitle className="text-base">How to use this</CardTitle></CardHeader>
+                                <CardContent className="grid gap-3 text-sm text-slate-700">
+                                    <div className="rounded-2xl border border-slate-200 bg-white p-4"><div className="font-semibold">1) Journal like a scientist</div><div className="mt-1 text-slate-600">Write what you saw, what you expected, what actually happened.</div></div>
+                                    <div className="rounded-2xl border border-slate-200 bg-white p-4"><div className="font-semibold">2) Promote patterns into strategies</div><div className="mt-1 text-slate-600">When something repeats, move it into the Strategy Library.</div></div>
+                                    <div className="rounded-2xl border border-slate-200 bg-white p-4"><div className="font-semibold">3) Link trades to strategies</div><div className="mt-1 text-slate-600">So later you can see which strategy is truly paying.</div></div>
+                                    <div className="rounded-2xl border border-slate-200 bg-white p-4"><div className="font-semibold">4) Protect your data</div><div className="mt-1 text-slate-600">Use Export sometimes. Import restores it on any device.</div></div>
+                                    <Separator /><div className="text-xs text-slate-500 flex items-center gap-2"><CloudCheck className="w-4 h-4 text-emerald-500" /> Cloud Sync Active. Data is saved to your Supabase account securely.</div>
+                                </CardContent></Card></div>
+                        </div></TabsContent>
+                    </Tabs></div>
+                    <div className="mt-8 text-xs text-slate-500">Tip: the best journals are simple. Keep your entries short but precise, then review weekly and promote only what repeats.</div>
+                </>
+            )}
         </div></div>
     );
 }

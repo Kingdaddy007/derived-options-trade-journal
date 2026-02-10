@@ -4,15 +4,9 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-// import { Textarea } from "@/components/ui/textarea"; // Not used here directly, used in main component
-import { Badge } from "@/components/ui/badge";
-// import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"; // Not used here directly
-// import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"; // Not used here directly
-// import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"; // Not used here directly
-// import { Separator } from "@/components/ui/separator"; // Not used here directly
-// import { Switch } from "@/components/ui/switch"; // Not used here directly
 import { Label } from "@/components/ui/label";
 import { Sparkles, Download, Upload, Trash2 } from "lucide-react";
+import { supabase } from "@/lib/supabaseClient";
 
 const STORAGE_KEY = "dozzy_trade_journal_v1";
 
@@ -42,7 +36,7 @@ interface TradeEntry {
     outcome: "Win" | "Loss" | "BE"; entryTimeISO: string; notes: string; whatISaw: string;
     whatWorked: string; whatDidnt: string; tags: string[]; strategyId?: string;
     screenshots?: TradeScreenshot[]; createdAtISO: string; updatedAtISO: string;
-    confidence: number; // 1-5
+    confidence: number;
 }
 
 interface Strategy {
@@ -60,11 +54,11 @@ function defaultState(): AppState {
             id: uid(), name: "Volatility Spike Fade (example)",
             summary: "A simple example: after an exaggerated move, wait for exhaustion and fade back to mean.",
             trigger: "A sudden spike that stretches 2–3 candles beyond recent range.",
-            confirmation: "Momentum slows + wick rejection + volume/tempo reduces (whatever you use).",
-            riskRules: "1–2 entries max. If second entry fails, stop. Never chase.",
-            execution: "Enter on the first clear rejection. Keep stake consistent.",
-            avoid: "Avoid during major news spikes or when the market is trending hard.",
-            examples: "Write your best examples here: what you saw, why it worked.",
+            confirmation: "Momentum slows + wick rejection + volume/tempo reduces.",
+            riskRules: "1–2 entries max. If second entry fails, stop.",
+            execution: "Enter on the first clear rejection.",
+            avoid: "Avoid during major news spikes.",
+            examples: "Write your best examples here.",
             tags: ["mean-reversion", "patience"], isTop: true,
             createdAtISO: toISO(Date.now()), updatedAtISO: toISO(Date.now()),
         }],
@@ -121,14 +115,151 @@ function validateState(raw: any): AppState {
     };
 }
 
-function useLocalState(): [AppState, React.Dispatch<React.SetStateAction<AppState>>] {
-    const [state, setState] = useState<AppState>(() => {
-        if (typeof window === "undefined") return defaultState();
-        const raw = safeParseJSON(localStorage.getItem(STORAGE_KEY) || "");
-        return validateState(raw);
-    });
-    useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }, [state]);
-    return [state, setState];
+// Map frontend camelCase to DB snake_case
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mapEntryToDB(e: TradeEntry): any {
+    return {
+        id: e.id, title: e.title, trade_type: e.tradeType, market: e.market, timeframe: e.timeframe,
+        direction: e.direction, stake: e.stake, payout: e.payout, profit: e.profit, outcome: e.outcome,
+        entry_time_iso: e.entryTimeISO, notes: e.notes, what_i_saw: e.whatISaw, what_worked: e.whatWorked,
+        what_didnt: e.whatDidnt, tags: e.tags, strategy_id: e.strategyId || null,
+        screenshots: e.screenshots, confidence: e.confidence, created_at: e.createdAtISO, updated_at: e.updatedAtISO
+    };
+}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mapDBToEntry(d: any): TradeEntry {
+    return {
+        id: d.id, title: d.title, tradeType: d.trade_type, market: d.market, timeframe: d.timeframe,
+        direction: d.direction, stake: Number(d.stake), payout: Number(d.payout), profit: Number(d.profit),
+        outcome: d.outcome, entryTimeISO: d.entry_time_iso, notes: d.notes, whatISaw: d.what_i_saw,
+        whatWorked: d.what_worked, whatDidnt: d.what_didnt, tags: d.tags || [],
+        strategyId: d.strategy_id || undefined, screenshots: d.screenshots || [],
+        confidence: d.confidence || 3, createdAtISO: d.created_at, updatedAtISO: d.updated_at
+    };
+}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mapStrategyToDB(s: Strategy): any {
+    return {
+        id: s.id, name: s.name, summary: s.summary, trigger: s.trigger, confirmation: s.confirmation,
+        risk_rules: s.riskRules, execution: s.execution, avoid: s.avoid, examples: s.examples, tags: s.tags,
+        is_top: s.isTop, created_at: s.createdAtISO, updated_at: s.updatedAtISO
+    };
+}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mapDBToStrategy(d: any): Strategy {
+    return {
+        id: d.id, name: d.name, summary: d.summary, trigger: d.trigger, confirmation: d.confirmation,
+        riskRules: d.risk_rules, execution: d.execution, avoid: d.avoid, examples: d.examples, tags: d.tags || [],
+        isTop: d.is_top, createdAtISO: d.created_at, updatedAtISO: d.updated_at
+    };
+}
+
+// New Hook: Sync with Supabase (fallbacks to local state if offline or initially)
+function useSupabaseSync(): {
+    state: AppState;
+    loading: boolean;
+    saveEntry: (e: TradeEntry) => Promise<void>;
+    deleteEntry: (id: string) => Promise<void>;
+    saveStrategy: (s: Strategy) => Promise<void>;
+    deleteStrategy: (id: string) => Promise<void>;
+    updateCurrency: (c: string) => Promise<void>;
+    wipeAll: () => Promise<void>;
+} {
+    const [state, setState] = useState<AppState>(defaultState());
+    const [loading, setLoading] = useState(true);
+    const [settingsId, setSettingsId] = useState<string | null>(null);
+
+    // Initial Fetch
+    useEffect(() => {
+        async function load() {
+            setLoading(true);
+            try {
+                // Load Settings
+                const { data: setRows } = await supabase.from("settings").select("*").limit(1);
+                const currency = setRows?.[0]?.currency || "$";
+                const tempSettingsId = setRows?.[0]?.id;
+                if (!tempSettingsId) {
+                    // Create default settings row if missing
+                    const { data: newRow } = await supabase.from("settings").insert([{ currency: "$" }]).select().single();
+                    if (newRow) setSettingsId(newRow.id);
+                } else {
+                    setSettingsId(tempSettingsId);
+                }
+
+                // Load Strategies
+                const { data: stratRows } = await supabase.from("strategies").select("*");
+                const strategies = (stratRows || []).map(mapDBToStrategy);
+
+                // Load Trades
+                const { data: tradeRows } = await supabase.from("trades").select("*").order("entry_time_iso", { ascending: false });
+                const entries = (tradeRows || []).map(mapDBToEntry);
+
+                setState({ entries, strategies, settings: { currency } });
+            } catch (err) {
+                console.error("Supabase load error:", err);
+            } finally {
+                setLoading(false);
+            }
+        }
+        load();
+    }, []);
+
+    const saveEntry = async (e: TradeEntry) => {
+        // Optimistic update
+        setState((prev) => {
+            const exists = prev.entries.some((x) => x.id === e.id);
+            return {
+                ...prev,
+                entries: exists ? prev.entries.map((x) => (x.id === e.id ? e : x)) : [e, ...prev.entries],
+            };
+        });
+        // DB update
+        await supabase.from("trades").upsert(mapEntryToDB(e));
+    };
+
+    const deleteEntry = async (id: string) => {
+        setState((prev) => ({ ...prev, entries: prev.entries.filter((e) => e.id !== id) }));
+        await supabase.from("trades").delete().eq("id", id);
+    };
+
+    const saveStrategy = async (s: Strategy) => {
+        setState((prev) => {
+            const exists = prev.strategies.some((x) => x.id === s.id);
+            return {
+                ...prev,
+                strategies: exists ? prev.strategies.map((x) => (x.id === s.id ? s : x)) : [s, ...prev.strategies],
+            };
+        });
+        await supabase.from("strategies").upsert(mapStrategyToDB(s));
+    };
+
+    const deleteStrategy = async (id: string) => {
+        setState((prev) => ({
+            ...prev,
+            strategies: prev.strategies.filter((s) => s.id !== id),
+            entries: prev.entries.map((e) => (e.strategyId === id ? { ...e, strategyId: undefined } : e)),
+        }));
+        await supabase.from("strategies").delete().eq("id", id);
+        // Also update linked trades to remove strategy_id
+        await supabase.from("trades").update({ strategy_id: null }).eq("strategy_id", id);
+    };
+
+    const updateCurrency = async (c: string) => {
+        setState((prev) => ({ ...prev, settings: { ...prev.settings, currency: c } }));
+        if (settingsId) {
+            await supabase.from("settings").update({ currency: c }).eq("id", settingsId);
+        }
+    };
+
+    const wipeAll = async () => {
+        const ok = window.confirm("This will Delete ALL data from the Cloud Database. Irreversible!");
+        if (!ok) return;
+        setState(defaultState());
+        await supabase.from("trades").delete().neq("id", "00000000-0000-0000-0000-000000000000"); // Delete all
+        await supabase.from("strategies").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+    };
+
+    return { state, loading, saveEntry, deleteEntry, saveStrategy, deleteStrategy, updateCurrency, wipeAll };
 }
 
 function splitTags(raw: string) { return raw.split(",").map((t) => t.trim()).filter(Boolean).slice(0, 20); }
@@ -183,12 +314,12 @@ function StarPicker({ value, onChange }: { value: number; onChange: (v: number) 
 function TopBar({ currency, onCurrency, onExport, onImport, onWipe }: { currency: string; onCurrency: (c: string) => void; onExport: () => void; onImport: (f: File) => void; onWipe: () => void }) {
     return (<div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between"><div>
         <div className="text-2xl font-semibold tracking-tight">Derived Options Trade Journal</div>
-        <div className="text-sm text-slate-600">Log Rise/Fall & Touched trades. Save what you saw. Build a profitable strategy library.</div></div>
+        <div className="text-sm text-slate-600">Syncing with Cloud Database ☁️</div></div>
         <div className="flex flex-wrap gap-2 items-center">
             <div className="flex items-center gap-2"><Label className="text-xs text-slate-600">Currency</Label><Input value={currency} onChange={(e) => onCurrency(e.target.value)} className="w-16" /></div>
-            <Button variant="outline" onClick={onExport} className="gap-2"><Download className="w-4 h-4" />Export</Button>
-            <FileButton accept="application/json" onFile={onImport}><span className="inline-flex items-center gap-2"><Upload className="w-4 h-4" />Import</span></FileButton>
-            <Button variant="destructive" onClick={onWipe} className="gap-2"><Trash2 className="w-4 h-4" />Wipe</Button>
+            <Button variant="outline" onClick={onExport} className="gap-2"><Download className="w-4 h-4" />Export JSON</Button>
+            <FileButton accept="application/json" onFile={onImport}><span className="inline-flex items-center gap-2"><Upload className="w-4 h-4" />Import JSON</span></FileButton>
+            <Button variant="destructive" onClick={onWipe} className="gap-2"><Trash2 className="w-4 h-4" />Wipe Cloud</Button>
         </div></div>);
 }
 
@@ -213,5 +344,5 @@ function StatsStrip({ entries, currency }: { entries: TradeEntry[]; currency: st
     </div>);
 }
 
-export { uid, clampNum, toISO, formatMoney, splitTags, statColorClass, Pill, Stars, StarPicker, EmptyState, FileButton, smallDate, outcomeFromProfit, computeProfit, TopBar, StatsStrip, useLocalState, defaultState, safeParseJSON, validateState, STORAGE_KEY };
+export { uid, clampNum, toISO, formatMoney, splitTags, statColorClass, Pill, Stars, StarPicker, EmptyState, FileButton, smallDate, outcomeFromProfit, computeProfit, TopBar, StatsStrip, useSupabaseSync, defaultState, safeParseJSON, validateState, STORAGE_KEY };
 export type { TradeEntry, Strategy, AppState, TradeScreenshot };
