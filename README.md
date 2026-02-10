@@ -1,36 +1,45 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Derived Options Trade Journal
 
-## Getting Started
+A local-first trading journal for derived options (Rise/Fall, Touch/No-Touch), built with React, Next.js, and shadcn/ui.
 
-First, run the development server:
+## 🚀 Deployment Instructions
 
+### 1. Initialize & Commit (Local)
+Since this is a fresh setup, you need to save your changes locally first:
+
+1. Open your terminal in this folder (`trade-journal-app`).
+2. Run these commands:
+   ```bash
+   git add .
+   git commit -m "Initial commit"
+   ```
+   *(If prompted to configure user/email, run: `git config user.email "you@example.com"` and `git config user.name "Your Name"` first)*
+
+### 2. Push to GitHub
+1. Create a new repository on [GitHub](https://github.com/new).
+2. Run these commands:
+   ```bash
+   git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO_NAME.git
+   git branch -M main
+   git push -u origin main
+   ```
+
+### 3. Deploy on Vercel
+1. Go to [Vercel](https://vercel.com/new).
+2. Import your new GitHub repository.
+3. Click **Deploy**.
+4. That's it! Your journal will be live.
+
+## ✨ Features
+- **Journal Trades**: Log Rise/Fall & Touch trades with rich details.
+- **Strategy Library**: Define triggers, confirmations, and risk rules.
+- **Analytics**: Track win rates, profit, and return on investment.
+- **Local Storage**: Data stays in your browser (no database required).
+- **Export/Import**: Backup your data to JSON files.
+
+## 🛠️ Development
+Run the development server:
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Open [http://localhost:3000](http://localhost:3000) to view it.

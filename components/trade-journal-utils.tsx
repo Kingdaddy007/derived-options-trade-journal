@@ -4,15 +4,15 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+// import { Textarea } from "@/components/ui/textarea"; // Not used here directly, used in main component
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
-import { Switch } from "@/components/ui/switch";
+// import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"; // Not used here directly
+// import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"; // Not used here directly
+// import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"; // Not used here directly
+// import { Separator } from "@/components/ui/separator"; // Not used here directly
+// import { Switch } from "@/components/ui/switch"; // Not used here directly
 import { Label } from "@/components/ui/label";
-import { Search, Plus, TrendingUp, BookOpen, Sparkles, X, Download, Upload, Trash2, Copy } from "lucide-react";
+import { Sparkles, Download, Upload, Trash2 } from "lucide-react";
 
 const STORAGE_KEY = "dozzy_trade_journal_v1";
 
@@ -42,6 +42,7 @@ interface TradeEntry {
     outcome: "Win" | "Loss" | "BE"; entryTimeISO: string; notes: string; whatISaw: string;
     whatWorked: string; whatDidnt: string; tags: string[]; strategyId?: string;
     screenshots?: TradeScreenshot[]; createdAtISO: string; updatedAtISO: string;
+    confidence: number; // 1-5
 }
 
 interface Strategy {
@@ -103,6 +104,7 @@ function validateState(raw: any): AppState {
                 : [],
             createdAtISO: String(e.createdAtISO ?? toISO(Date.now())),
             updatedAtISO: String(e.updatedAtISO ?? toISO(Date.now())),
+            confidence: Math.max(1, Math.min(5, clampNum(e.confidence, 3))),
         })),
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         strategies: strategies.map((s: any) => ({
@@ -150,6 +152,34 @@ function FileButton({ onFile, accept, children }: { onFile: (f: File) => void; a
         <Button variant="outline" onClick={() => { ref.current?.click?.(); }}>{children}</Button></>);
 }
 
+function Stars({ value = 0 }: { value?: number }) {
+    const v = Math.max(0, Math.min(5, Number(value) || 0));
+    return (
+        <span className="inline-flex items-center gap-0.5" aria-label={`Confidence ${v} out of 5`}>
+            {Array.from({ length: 5 }).map((_, i) => (
+                <span key={i} className={i < v ? "text-amber-500 text-sm" : "text-slate-300 text-sm"}>★</span>
+            ))}
+        </span>
+    );
+}
+
+function StarPicker({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+    const v = Math.max(1, Math.min(5, Number(value) || 3));
+    return (
+        <div className="flex items-center gap-2">
+            <div className="inline-flex items-center gap-1">
+                {Array.from({ length: 5 }).map((_, i) => {
+                    const n = i + 1; const active = n <= v;
+                    return (
+                        <button type="button" key={n} onClick={() => onChange(n)} className={"rounded-full px-2 py-1 border text-sm transition " + (active ? "border-amber-300 bg-amber-50 text-amber-700" : "border-slate-200 bg-white text-slate-400 hover:text-slate-600")} title={`${n}/5`}>★</button>
+                    );
+                })}
+            </div>
+            <span className="text-xs text-slate-600">{v}/5</span>
+        </div>
+    );
+}
+
 function TopBar({ currency, onCurrency, onExport, onImport, onWipe }: { currency: string; onCurrency: (c: string) => void; onExport: () => void; onImport: (f: File) => void; onWipe: () => void }) {
     return (<div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between"><div>
         <div className="text-2xl font-semibold tracking-tight">Derived Options Trade Journal</div>
@@ -183,5 +213,5 @@ function StatsStrip({ entries, currency }: { entries: TradeEntry[]; currency: st
     </div>);
 }
 
-export { uid, clampNum, toISO, formatMoney, splitTags, statColorClass, Pill, EmptyState, FileButton, smallDate, outcomeFromProfit, computeProfit, TopBar, StatsStrip, useLocalState, defaultState, safeParseJSON, validateState, STORAGE_KEY };
+export { uid, clampNum, toISO, formatMoney, splitTags, statColorClass, Pill, Stars, StarPicker, EmptyState, FileButton, smallDate, outcomeFromProfit, computeProfit, TopBar, StatsStrip, useLocalState, defaultState, safeParseJSON, validateState, STORAGE_KEY };
 export type { TradeEntry, Strategy, AppState, TradeScreenshot };

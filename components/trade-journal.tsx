@@ -16,10 +16,10 @@ import { Search, Plus, TrendingUp, BookOpen, Copy } from "lucide-react";
 import {
     uid, clampNum, toISO, formatMoney, splitTags, statColorClass, Pill,
     EmptyState, FileButton, smallDate, outcomeFromProfit, computeProfit, TopBar, StatsStrip, useLocalState,
-    defaultState, validateState, safeParseJSON,
+    defaultState, validateState, safeParseJSON, Stars, StarPicker
 } from "@/components/trade-journal-utils";
-import type { TradeEntry, Strategy } from "@/components/trade-journal-utils";
-import { useEffect, useRef } from "react";
+import type { TradeEntry, Strategy, TradeScreenshot } from "@/components/trade-journal-utils";
+import { useEffect } from "react";
 import { Upload, X } from "lucide-react";
 
 function EntryForm({ strategies, currency, initial, onSave, onCancel }: {
@@ -47,7 +47,8 @@ function EntryForm({ strategies, currency, initial, onSave, onCancel }: {
     const [whatISaw, setWhatISaw] = useState(initial?.whatISaw ?? "");
     const [whatWorked, setWhatWorked] = useState(initial?.whatWorked ?? "");
     const [whatDidnt, setWhatDidnt] = useState(initial?.whatDidnt ?? "");
-    const [screenshots, setScreenshots] = useState(initial?.screenshots ?? []);
+    const [screenshots, setScreenshots] = useState<TradeScreenshot[]>(initial?.screenshots ?? []);
+    const [confidence, setConfidence] = useState(() => Math.max(1, Math.min(5, clampNum(initial?.confidence, 3))));
     const [autoCalc, setAutoCalc] = useState(true);
 
     useEffect(() => {
@@ -81,6 +82,7 @@ function EntryForm({ strategies, currency, initial, onSave, onCancel }: {
             outcome: outcomeFromProfit(prof) as "Win" | "Loss" | "BE", entryTimeISO: new Date(entryTimeISO).toISOString(),
             notes, whatISaw, whatWorked, whatDidnt, tags: splitTags(tagsRaw), strategyId: strategyId || undefined,
             screenshots, createdAtISO: initial?.createdAtISO ?? toISO(Date.now()), updatedAtISO: toISO(Date.now()),
+            confidence,
         };
         onSave(entry);
     };
@@ -113,7 +115,10 @@ function EntryForm({ strategies, currency, initial, onSave, onCancel }: {
                         <SelectContent><SelectItem value="none">None</SelectItem>
                             {strategies.slice().sort((a, b) => Number(b.isTop) - Number(a.isTop) || a.name.localeCompare(b.name)).map((s) => (<SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>))}</SelectContent></Select></div>
             </div>
-            <div className="grid gap-2"><Label>Tags (comma separated)</Label><Input value={tagsRaw} onChange={(e) => setTagsRaw(e.target.value)} placeholder="e.g. reversal, patience, fakeout" /></div>
+            <div className="grid md:grid-cols-2 gap-3">
+                <div className="grid gap-2"><Label>Confidence</Label><div className="rounded-2xl border border-slate-200 p-3 bg-white"><StarPicker value={confidence} onChange={setConfidence} /><div className="text-xs text-slate-500 mt-2">Rate how clean this setup felt before you entered. This makes reviews deadly.</div></div></div>
+                <div className="grid gap-2"><Label>Tags (comma separated)</Label><Input value={tagsRaw} onChange={(e) => setTagsRaw(e.target.value)} placeholder="e.g. reversal, patience, fakeout" /></div>
+            </div>
             <div className="grid md:grid-cols-2 gap-3">
                 <div className="grid gap-2"><Label>What I saw (setup)</Label><Textarea value={whatISaw} onChange={(e) => setWhatISaw(e.target.value)} placeholder="Describe the market structure, tempo, fakeouts, levels, candles..." className="min-h-[120px]" /></div>
                 <div className="grid gap-2"><Label>Notes (context)</Label><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Mood, distractions, time-of-day, rules followed?" className="min-h-[120px]" /></div>
@@ -205,7 +210,9 @@ function TradeRow({ entry, strategy, currency, onEdit, onDelete }: {
                         {entry.tradeType !== "TOUCHED" ? <Pill>{entry.direction}</Pill> : null}
                         <Badge variant={entry.outcome === "Win" ? "default" : entry.outcome === "Loss" ? "destructive" : "secondary"}>{entry.outcome}</Badge>
                     </div>
-                    <div className="mt-1 text-xs text-slate-600">{smallDate(entry.entryTimeISO)}{strategy ? <span className="ml-2">• Strategy: <span className="font-medium">{strategy.name}</span></span> : null}</div>
+                    <div className="mt-1 text-xs text-slate-600">{smallDate(entry.entryTimeISO)}
+                        <span className="ml-2">• Confidence: <Stars value={entry.confidence || 0} /></span>
+                        {strategy ? <span className="ml-2">• Strategy: <span className="font-medium">{strategy.name}</span></span> : null}</div>
                 </div>
                 <div className="text-right shrink-0">
                     <div className={`text-lg font-semibold ${statColorClass(entry.profit)}`}>{formatMoney(entry.profit, currency)}</div>
@@ -261,6 +268,7 @@ export default function TradeJournal() {
     const [query, setQuery] = useState(""); const [filterOutcome, setFilterOutcome] = useState("all");
     const [filterType, setFilterType] = useState("all"); const [filterStrategy, setFilterStrategy] = useState("all");
     const [sortBy, setSortBy] = useState("newest");
+    const [viewMode, setViewMode] = useState("cards");
     const [tradeDialogOpen, setTradeDialogOpen] = useState(false); const [strategyDialogOpen, setStrategyDialogOpen] = useState(false);
     const [editingEntry, setEditingEntry] = useState<TradeEntry | null>(null); const [editingStrategy, setEditingStrategy] = useState<Strategy | null>(null);
     const currency = settings.currency || "$";
@@ -320,9 +328,22 @@ export default function TradeJournal() {
                             <div className="md:col-span-2"><Select value={filterType} onValueChange={setFilterType}><SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger><SelectContent><SelectItem value="all">All types</SelectItem><SelectItem value="R_F">Rise/Fall</SelectItem><SelectItem value="TOUCHED">Touched</SelectItem></SelectContent></Select></div>
                             <div className="md:col-span-3"><Select value={filterStrategy} onValueChange={setFilterStrategy}><SelectTrigger><SelectValue placeholder="Strategy" /></SelectTrigger><SelectContent><SelectItem value="all">All strategies</SelectItem><SelectItem value="none">No strategy</SelectItem>{strategies.slice().sort((a, b) => Number(b.isTop) - Number(a.isTop) || a.name.localeCompare(b.name)).map((s) => (<SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>))}</SelectContent></Select></div>
                             <div className="md:col-span-3"><Select value={sortBy} onValueChange={setSortBy}><SelectTrigger><SelectValue placeholder="Sort" /></SelectTrigger><SelectContent><SelectItem value="newest">Newest</SelectItem><SelectItem value="oldest">Oldest</SelectItem><SelectItem value="profit">Most profit</SelectItem><SelectItem value="loss">Most loss</SelectItem></SelectContent></Select></div>
+                            <div className="md:col-span-3"><Select value={viewMode} onValueChange={setViewMode}><SelectTrigger><SelectValue placeholder="View" /></SelectTrigger><SelectContent><SelectItem value="cards">Card view</SelectItem><SelectItem value="table">Table view</SelectItem></SelectContent></Select></div>
                         </div>
-                        {filteredEntries.length ? (<div className="grid gap-4">{filteredEntries.map((e) => (<TradeRow key={e.id} entry={e} strategy={e.strategyId ? strategyById.get(e.strategyId) : null} currency={currency} onEdit={(entry) => { setEditingEntry(entry); setTradeDialogOpen(true); }} onDelete={deleteEntry} />))}</div>)
-                            : (<EmptyState title={entries.length ? "No trades match your filters" : "No trades yet"} hint={entries.length ? "Try clearing filters or searching different words." : "Start logging. The power is in the review."} action={<Button onClick={() => setTradeDialogOpen(true)} className="gap-2"><Plus className="w-4 h-4" />Add your first trade</Button>} />)}
+                        {filteredEntries.length ? (
+                            viewMode === "table" ? (
+                                <div className="rounded-2xl border border-slate-200 overflow-hidden bg-white"><div className="overflow-x-auto"><table className="w-full text-sm">
+                                    <thead className="bg-slate-50 border-b border-slate-200"><tr className="text-left text-xs text-slate-600">
+                                        <th className="p-3">Date</th><th className="p-3">Type</th><th className="p-3">Market</th><th className="p-3">TF</th><th className="p-3">Dir</th><th className="p-3">Stake</th><th className="p-3">Payout</th><th className="p-3">Outcome</th><th className="p-3">P/L</th><th className="p-3">Strategy</th><th className="p-3">Conf.</th><th className="p-3"></th>
+                                    </tr></thead>
+                                    <tbody>{filteredEntries.map((e) => {
+                                        const strat = e.strategyId ? strategyById.get(e.strategyId) : null;
+                                        return (<tr key={e.id} className="border-b border-slate-100 hover:bg-slate-50">
+                                            <td className="p-3 text-slate-700 whitespace-nowrap">{smallDate(e.entryTimeISO)}</td><td className="p-3"><Pill>{e.tradeType === "TOUCHED" ? "Touched" : "Rise/Fall"}</Pill></td><td className="p-3 text-slate-700">{e.market || "—"}</td><td className="p-3 text-slate-700">{e.timeframe || "—"}</td><td className="p-3 text-slate-700">{e.tradeType === "TOUCHED" ? "—" : e.direction}</td><td className="p-3 text-slate-700 whitespace-nowrap">{formatMoney(e.stake, currency)}</td><td className="p-3 text-slate-700 whitespace-nowrap">{formatMoney(e.payout, currency)}</td><td className="p-3"><Badge variant={e.outcome === "Win" ? "default" : e.outcome === "Loss" ? "destructive" : "secondary"}>{e.outcome}</Badge></td><td className={`p-3 whitespace-nowrap font-medium ${statColorClass(e.profit)}`}>{formatMoney(e.profit, currency)}</td><td className="p-3 text-slate-700">{strat ? strat.name : "—"}</td><td className="p-3"><Stars value={e.confidence || 0} /></td><td className="p-3"><div className="flex gap-2 justify-end"><Button variant="outline" size="sm" onClick={() => { setEditingEntry(e); setTradeDialogOpen(true); }}>Edit</Button><Button variant="destructive" size="sm" onClick={() => deleteEntry(e.id)}>Delete</Button></div></td>
+                                        </tr>);
+                                    })}</tbody></table></div></div>
+                            ) : (<div className="grid gap-4">{filteredEntries.map((e) => (<TradeRow key={e.id} entry={e} strategy={e.strategyId ? strategyById.get(e.strategyId) : null} currency={currency} onEdit={(entry) => { setEditingEntry(entry); setTradeDialogOpen(true); }} onDelete={deleteEntry} />))}</div>)
+                        ) : (<EmptyState title={entries.length ? "No trades match your filters" : "No trades yet"} hint={entries.length ? "Try clearing filters or searching different words." : "Start logging. The power is in the review."} action={<Button onClick={() => setTradeDialogOpen(true)} className="gap-2"><Plus className="w-4 h-4" />Add your first trade</Button>} />)}
                     </CardContent></Card></TabsContent>
                 <TabsContent value="strategies" className="mt-4"><div className="grid lg:grid-cols-3 gap-4">
                     <div className="lg:col-span-2"><Card className="rounded-2xl"><CardHeader className="pb-3">
