@@ -5,8 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Sparkles, Download, Upload, Trash2 } from "lucide-react";
+import { Sparkles, Download, Upload, Trash2, Sun, Moon } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+import { useTheme } from "next-themes";
 
 const STORAGE_KEY = "dozzy_trade_journal_v1";
 
@@ -292,15 +293,15 @@ async function deleteStrategyImage(url: string): Promise<void> {
 
 function splitTags(raw: string) { return raw.split(",").map((t) => t.trim()).filter(Boolean).slice(0, 20); }
 function statColorClass(n: number) { if (n > 0) return "text-emerald-600"; if (n < 0) return "text-rose-600"; return "text-slate-600"; }
-function Pill({ children }: { children: React.ReactNode }) { return <span className="px-2 py-1 rounded-full text-xs bg-slate-100 text-slate-700 border border-slate-200">{children}</span>; }
+function Pill({ children }: { children: React.ReactNode }) { return <span className="px-2 py-1 rounded-full text-xs bg-slate-100 dark:bg-slate-700/50 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-600">{children}</span>; }
 function outcomeFromProfit(profit: string | number) { const p = clampNum(profit, 0); if (p > 0) return "Win"; if (p < 0) return "Loss"; return "BE"; }
 function computeProfit(stake: number, payout: number) { return clampNum(payout, 0) - clampNum(stake, 0); }
 function smallDate(iso: string) { const d = new Date(iso); if (Number.isNaN(d.getTime())) return ""; return d.toLocaleString(undefined, { year: "numeric", month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit" }); }
 
 function EmptyState({ title, hint, action }: { title: string; hint: string; action?: React.ReactNode }) {
     return (<div className="py-10 text-center"><div className="mx-auto max-w-md">
-        <div className="mx-auto w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center border border-slate-200"><Sparkles className="w-5 h-5" /></div>
-        <div className="mt-4 text-lg font-semibold">{title}</div><div className="mt-1 text-sm text-slate-600">{hint}</div>
+        <div className="mx-auto w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center border border-slate-200 dark:border-slate-700"><Sparkles className="w-5 h-5" /></div>
+        <div className="mt-4 text-lg font-semibold">{title}</div><div className="mt-1 text-sm text-muted-foreground">{hint}</div>
         {action ? <div className="mt-5 flex justify-center">{action}</div> : null}
     </div></div>);
 }
@@ -316,7 +317,7 @@ function Stars({ value = 0 }: { value?: number }) {
     return (
         <span className="inline-flex items-center gap-0.5" aria-label={`Confidence ${v} out of 5`}>
             {Array.from({ length: 5 }).map((_, i) => (
-                <span key={i} className={i < v ? "text-amber-500 text-sm" : "text-slate-300 text-sm"}>★</span>
+                <span key={i} className={i < v ? "text-amber-500 dark:text-amber-400 text-sm" : "text-slate-300 dark:text-slate-600 text-sm"}>★</span>
             ))}
         </span>
     );
@@ -330,21 +331,29 @@ function StarPicker({ value, onChange }: { value: number; onChange: (v: number) 
                 {Array.from({ length: 5 }).map((_, i) => {
                     const n = i + 1; const active = n <= v;
                     return (
-                        <button type="button" key={n} onClick={() => onChange(n)} className={"rounded-full px-2 py-1 border text-sm transition " + (active ? "border-amber-300 bg-amber-50 text-amber-700" : "border-slate-200 bg-white text-slate-400 hover:text-slate-600")} title={`${n}/5`}>★</button>
+                        <button type="button" key={n} onClick={() => onChange(n)} className={"rounded-full px-2 py-1 border text-sm transition " + (active ? "border-amber-300 dark:border-amber-600 bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400" : "border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300")} title={`${n}/5`}>★</button>
                     );
                 })}
             </div>
-            <span className="text-xs text-slate-600">{v}/5</span>
+            <span className="text-xs text-muted-foreground">{v}/5</span>
         </div>
     );
 }
 
 function TopBar({ currency, onCurrency, onExport, onImport, onWipe }: { currency: string; onCurrency: (c: string) => void; onExport: () => void; onImport: (f: File) => void; onWipe: () => void }) {
+    const { theme, setTheme } = useTheme();
+    const [mounted, setMounted] = useState(false);
+    useEffect(() => { setMounted(true); }, []);
     return (<div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between"><div>
         <div className="text-2xl font-semibold tracking-tight">Derived Options Trade Journal</div>
-        <div className="text-sm text-slate-600">Syncing with Cloud Database ☁️</div></div>
+        <div className="text-sm text-muted-foreground">Syncing with Cloud Database ☁️</div></div>
         <div className="flex flex-wrap gap-2 items-center">
-            <div className="flex items-center gap-2"><Label className="text-xs text-slate-600">Currency</Label><Input value={currency} onChange={(e) => onCurrency(e.target.value)} className="w-16" /></div>
+            {mounted && (
+                <Button variant="outline" size="icon" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} title="Toggle theme">
+                    {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                </Button>
+            )}
+            <div className="flex items-center gap-2"><Label className="text-xs text-muted-foreground">Currency</Label><Input value={currency} onChange={(e) => onCurrency(e.target.value)} className="w-16" /></div>
             <Button variant="outline" onClick={onExport} className="gap-2"><Download className="w-4 h-4" />Export JSON</Button>
             <FileButton accept="application/json" onFile={onImport}><span className="inline-flex items-center gap-2"><Upload className="w-4 h-4" />Import JSON</span></FileButton>
             <Button variant="destructive" onClick={onWipe} className="gap-2"><Trash2 className="w-4 h-4" />Wipe Cloud</Button>

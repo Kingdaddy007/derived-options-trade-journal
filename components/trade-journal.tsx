@@ -107,16 +107,16 @@ function EntryForm({ strategies, currency, initial, onSave, onCancel }: {
                 <div className="grid gap-2"><Label>Stake</Label><Input value={stake} onChange={(e) => setStake(e.target.value)} placeholder="0" inputMode="decimal" /></div>
                 <div className="grid gap-2"><Label>Payout</Label><Input value={payout} onChange={(e) => setPayout(e.target.value)} placeholder="0" inputMode="decimal" /></div>
                 <div className="grid gap-2">
-                    <div className="flex items-center justify-between"><Label>Profit/Loss</Label><div className="flex items-center gap-2"><Switch checked={autoCalc} onCheckedChange={setAutoCalc} /><span className="text-xs text-slate-600">Auto</span></div></div>
+                    <div className="flex items-center justify-between"><Label>Profit/Loss</Label><div className="flex items-center gap-2"><Switch checked={autoCalc} onCheckedChange={setAutoCalc} /><span className="text-xs text-muted-foreground">Auto</span></div></div>
                     <Input value={profit} onChange={(e) => setProfit(e.target.value)} placeholder="auto" inputMode="decimal" />
-                    <div className={`text-xs ${outcome === "Win" ? "text-emerald-700" : outcome === "Loss" ? "text-rose-700" : "text-slate-600"}`}>Outcome: <span className="font-medium">{outcome}</span></div></div>
+                    <div className={`text-xs ${outcome === "Win" ? "text-emerald-700 dark:text-emerald-400" : outcome === "Loss" ? "text-rose-700 dark:text-rose-400" : "text-muted-foreground"}`}>Outcome: <span className="font-medium">{outcome}</span></div></div>
                 <div className="grid gap-2"><Label>Link to strategy</Label>
                     <Select value={strategyId || "none"} onValueChange={(v) => setStrategyId(v === "none" ? "" : v)}><SelectTrigger><SelectValue placeholder="Optional" /></SelectTrigger>
                         <SelectContent><SelectItem value="none">None</SelectItem>
                             {strategies.slice().sort((a, b) => Number(b.isTop) - Number(a.isTop) || a.name.localeCompare(b.name)).map((s) => (<SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>))}</SelectContent></Select></div>
             </div>
             <div className="grid md:grid-cols-2 gap-3">
-                <div className="grid gap-2"><Label>Confidence</Label><div className="rounded-2xl border border-slate-200 p-3 bg-white"><StarPicker value={confidence} onChange={setConfidence} /><div className="text-xs text-slate-500 mt-2">Rate how clean this setup felt before you entered. This makes reviews deadly.</div></div></div>
+                <div className="grid gap-2"><Label>Confidence</Label><div className="rounded-2xl border border-border p-3 bg-card"><StarPicker value={confidence} onChange={setConfidence} /><div className="text-xs text-muted-foreground mt-2">Rate how clean this setup felt before you entered. This makes reviews deadly.</div></div></div>
                 <div className="grid gap-2"><Label>Tags (comma separated)</Label><Input value={tagsRaw} onChange={(e) => setTagsRaw(e.target.value)} placeholder="e.g. reversal, patience, fakeout" /></div>
             </div>
             <div className="grid md:grid-cols-2 gap-3">
@@ -132,12 +132,12 @@ function EntryForm({ strategies, currency, initial, onSave, onCancel }: {
                     <FileButton accept="image/*" onFile={addScreenshot}><span className="inline-flex items-center gap-2"><Upload className="w-4 h-4" />Add image</span></FileButton></div>
                 {screenshots?.length ? (
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                        {screenshots.map((s) => (<div key={s.name} className="relative rounded-2xl overflow-hidden border border-slate-200 bg-white">
-                            <img src={s.dataUrl} alt={s.name} className="w-full h-32 object-cover" /><div className="p-2 text-xs text-slate-600 truncate">{s.name}</div>
-                            <button className="absolute top-2 right-2 bg-white/90 border border-slate-200 rounded-full p-1" onClick={() => removeShot(s.name)} title="Remove"><X className="w-4 h-4" /></button></div>))}
-                    </div>) : (<div className="text-sm text-slate-500">No screenshots yet.</div>)}
+                        {screenshots.map((s) => (<div key={s.name} className="relative rounded-2xl overflow-hidden border border-border bg-card">
+                            <img src={s.dataUrl} alt={s.name} className="w-full h-32 object-cover" /><div className="p-2 text-xs text-muted-foreground truncate">{s.name}</div>
+                            <button className="absolute top-2 right-2 bg-card/90 border border-border rounded-full p-1" onClick={() => removeShot(s.name)} title="Remove"><X className="w-4 h-4" /></button></div>))}
+                    </div>) : (<div className="text-sm text-muted-foreground">No screenshots yet.</div>)}
             </div>
-            <DialogFooter className="gap-2 sticky bottom-0 bg-white pt-3 border-t border-slate-200">
+            <DialogFooter className="gap-2 sticky bottom-0 bg-background pt-3 border-t border-border">
                 <Button variant="outline" onClick={onCancel}>Cancel</Button>
                 <Button onClick={save}>{isEdit ? "Update trade" : "Save trade"}</Button>
             </DialogFooter>
@@ -191,8 +191,8 @@ function StrategyForm({ initial, onSave, onCancel }: { initial: Strategy | null;
             <div className="grid md:grid-cols-2 gap-3">
                 <div className="grid gap-2"><Label>Strategy name</Label><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. 0.00 / 0.30 Tick Timing Edge" /></div>
                 <div className="grid gap-2"><Label>Mark as Top / Profitable</Label>
-                    <div className="flex items-center gap-3 rounded-2xl border border-slate-200 p-3"><Switch checked={isTop} onCheckedChange={setIsTop} />
-                        <div><div className="text-sm font-medium">Top Strategy</div><div className="text-xs text-slate-600">Keep your best stuff easy to find.</div></div></div></div>
+                    <div className="flex items-center gap-3 rounded-2xl border border-border p-3"><Switch checked={isTop} onCheckedChange={setIsTop} />
+                        <div><div className="text-sm font-medium">Top Strategy</div><div className="text-xs text-muted-foreground">Keep your best stuff easy to find.</div></div></div></div>
             </div>
             <div className="grid gap-2"><Label>Summary</Label><Textarea value={summary} onChange={(e) => setSummary(e.target.value)} placeholder="What is this strategy in one clear paragraph?" className="min-h-[90px]" /></div>
             <div className="grid md:grid-cols-2 gap-3">
@@ -219,18 +219,18 @@ function StrategyForm({ initial, onSave, onCancel }: { initial: Strategy | null;
                 {exampleImages.length > 0 ? (
                     <div className="grid grid-cols-3 gap-3">
                         {exampleImages.map((url) => (
-                            <div key={url} className="relative rounded-2xl overflow-hidden border border-slate-200 bg-white">
+                            <div key={url} className="relative rounded-2xl overflow-hidden border border-border bg-card">
                                 <img src={url} alt="Example" className="w-full h-32 object-cover" />
-                                <button className="absolute top-2 right-2 bg-white/90 border border-slate-200 rounded-full p-1" onClick={() => handleImageRemove(url)} title="Remove"><X className="w-4 h-4" /></button>
+                                <button className="absolute top-2 right-2 bg-card/90 border border-border rounded-full p-1" onClick={() => handleImageRemove(url)} title="Remove"><X className="w-4 h-4" /></button>
                             </div>
                         ))}
                     </div>
                 ) : (
-                    <div className="text-sm text-slate-500 rounded-2xl border border-dashed border-slate-300 p-4 text-center">No example screenshots yet. Upload chart images to remember what this strategy looks like.</div>
+                    <div className="text-sm text-muted-foreground rounded-2xl border border-dashed border-border p-4 text-center">No example screenshots yet. Upload chart images to remember what this strategy looks like.</div>
                 )}
             </div>
             <div className="grid gap-2"><Label>Tags (comma separated)</Label><Input value={tagsRaw} onChange={(e) => setTagsRaw(e.target.value)} placeholder="e.g. timing, ticks, trend, reversal" /></div>
-            <DialogFooter className="gap-2 sticky bottom-0 bg-white pt-3 border-t border-slate-200">
+            <DialogFooter className="gap-2 sticky bottom-0 bg-background pt-3 border-t border-border">
                 <Button variant="outline" onClick={onCancel}>Cancel</Button>
                 <Button onClick={save} disabled={uploading}>{isEdit ? "Update strategy" : "Save strategy"}</Button>
             </DialogFooter>
@@ -242,7 +242,7 @@ function TradeRow({ entry, strategy, currency, onEdit, onDelete }: {
     entry: TradeEntry; strategy: Strategy | null | undefined; currency: string; onEdit: (e: TradeEntry) => void; onDelete: (id: string) => void;
 }) {
     return (
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 flex flex-col gap-3">
+        <div className="rounded-2xl border border-border bg-card p-4 flex flex-col gap-3">
             <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
@@ -251,28 +251,28 @@ function TradeRow({ entry, strategy, currency, onEdit, onDelete }: {
                         {entry.tradeType !== "TOUCHED" ? <Pill>{entry.direction}</Pill> : null}
                         <Badge variant={entry.outcome === "Win" ? "default" : entry.outcome === "Loss" ? "destructive" : "secondary"}>{entry.outcome}</Badge>
                     </div>
-                    <div className="mt-1 text-xs text-slate-600">{smallDate(entry.entryTimeISO)}
+                    <div className="mt-1 text-xs text-muted-foreground">{smallDate(entry.entryTimeISO)}
                         <span className="ml-2">• Confidence: <Stars value={entry.confidence || 0} /></span>
                         {strategy ? <span className="ml-2">• Strategy: <span className="font-medium">{strategy.name}</span></span> : null}</div>
                 </div>
                 <div className="text-right shrink-0">
                     <div className={`text-lg font-semibold ${statColorClass(entry.profit)}`}>{formatMoney(entry.profit, currency)}</div>
-                    <div className="text-xs text-slate-600">Stake {formatMoney(entry.stake, currency)} • Payout {formatMoney(entry.payout, currency)}</div>
+                    <div className="text-xs text-muted-foreground">Stake {formatMoney(entry.stake, currency)} • Payout {formatMoney(entry.payout, currency)}</div>
                 </div>
             </div>
             <div className="grid md:grid-cols-3 gap-3">
-                <div className="rounded-xl bg-slate-50 border border-slate-200 p-3"><div className="text-xs font-medium text-slate-700">What I saw</div><div className="text-sm text-slate-700 mt-1 whitespace-pre-wrap">{entry.whatISaw || <span className="text-slate-400">—</span>}</div></div>
-                <div className="rounded-xl bg-slate-50 border border-slate-200 p-3"><div className="text-xs font-medium text-slate-700">What worked</div><div className="text-sm text-slate-700 mt-1 whitespace-pre-wrap">{entry.whatWorked || <span className="text-slate-400">—</span>}</div></div>
-                <div className="rounded-xl bg-slate-50 border border-slate-200 p-3"><div className="text-xs font-medium text-slate-700">What didn&apos;t</div><div className="text-sm text-slate-700 mt-1 whitespace-pre-wrap">{entry.whatDidnt || <span className="text-slate-400">—</span>}</div></div>
+                <div className="rounded-xl bg-muted/50 border border-border p-3"><div className="text-xs font-medium text-foreground/80">What I saw</div><div className="text-sm text-foreground/70 mt-1 whitespace-pre-wrap">{entry.whatISaw || <span className="text-muted-foreground">—</span>}</div></div>
+                <div className="rounded-xl bg-muted/50 border border-border p-3"><div className="text-xs font-medium text-foreground/80">What worked</div><div className="text-sm text-foreground/70 mt-1 whitespace-pre-wrap">{entry.whatWorked || <span className="text-muted-foreground">—</span>}</div></div>
+                <div className="rounded-xl bg-muted/50 border border-border p-3"><div className="text-xs font-medium text-foreground/80">What didn&apos;t</div><div className="text-sm text-foreground/70 mt-1 whitespace-pre-wrap">{entry.whatDidnt || <span className="text-muted-foreground">—</span>}</div></div>
             </div>
             {(entry.notes || entry.tags?.length || entry.screenshots?.length) ? (
                 <div className="grid gap-2">
-                    {entry.notes ? <div className="text-sm text-slate-700 whitespace-pre-wrap"><span className="text-xs font-medium text-slate-600">Notes:</span> {entry.notes}</div> : null}
-                    {entry.tags?.length ? <div className="flex flex-wrap gap-2">{entry.tags.map((t) => (<span key={t} className="text-xs px-2 py-1 rounded-full bg-white border border-slate-200 text-slate-700">#{t}</span>))}</div> : null}
-                    {entry.screenshots?.length ? <div className="flex gap-2 overflow-x-auto pb-2">{entry.screenshots.map((s) => (<img key={s.name} src={s.dataUrl} alt={s.name} className="h-20 w-28 object-cover rounded-xl border border-slate-200" />))}</div> : null}
+                    {entry.notes ? <div className="text-sm text-foreground/70 whitespace-pre-wrap"><span className="text-xs font-medium text-muted-foreground">Notes:</span> {entry.notes}</div> : null}
+                    {entry.tags?.length ? <div className="flex flex-wrap gap-2">{entry.tags.map((t) => (<span key={t} className="text-xs px-2 py-1 rounded-full bg-card border border-border text-foreground/80">#{t}</span>))}</div> : null}
+                    {entry.screenshots?.length ? <div className="flex gap-2 overflow-x-auto pb-2">{entry.screenshots.map((s) => (<img key={s.name} src={s.dataUrl} alt={s.name} className="h-20 w-28 object-cover rounded-xl border border-border" />))}</div> : null}
                 </div>) : null}
             <div className="flex items-center justify-between">
-                <div className="text-xs text-slate-500">Updated {smallDate(entry.updatedAtISO)}</div>
+                <div className="text-xs text-muted-foreground">Updated {smallDate(entry.updatedAtISO)}</div>
                 <div className="flex gap-2"><Button variant="outline" size="sm" onClick={() => onEdit(entry)}>Edit</Button><Button variant="destructive" size="sm" onClick={() => onDelete(entry.id)}>Delete</Button></div>
             </div>
         </div>
@@ -285,23 +285,23 @@ function StrategyCard({ s, linkedTradesCount, onEdit, onDelete, onDuplicate, onT
     return (
         <Card className="rounded-2xl"><CardHeader className="pb-2">
             <div className="flex items-start justify-between gap-3"><div className="min-w-0"><CardTitle className="text-base truncate">{s.name}</CardTitle>
-                <div className="mt-1 text-xs text-slate-600">{linkedTradesCount} linked trades • Updated {smallDate(s.updatedAtISO)}</div></div>
-                <div className="flex items-center gap-2"><Switch checked={s.isTop} onCheckedChange={() => onToggleTop(s.id)} /><span className="text-xs text-slate-600">Top</span></div></div>
+                <div className="mt-1 text-xs text-muted-foreground">{linkedTradesCount} linked trades • Updated {smallDate(s.updatedAtISO)}</div></div>
+                <div className="flex items-center gap-2"><Switch checked={s.isTop} onCheckedChange={() => onToggleTop(s.id)} /><span className="text-xs text-muted-foreground">Top</span></div></div>
         </CardHeader><CardContent className="grid gap-3">
-                {s.summary ? <div className="text-sm text-slate-700 whitespace-pre-wrap">{s.summary}</div> : null}
+                {s.summary ? <div className="text-sm text-foreground/70 whitespace-pre-wrap">{s.summary}</div> : null}
                 <div className="grid md:grid-cols-2 gap-3">
-                    <div className="rounded-xl bg-slate-50 border border-slate-200 p-3"><div className="text-xs font-medium text-slate-700">Trigger</div><div className="text-sm text-slate-700 mt-1 whitespace-pre-wrap">{s.trigger || <span className="text-slate-400">—</span>}</div></div>
-                    <div className="rounded-xl bg-slate-50 border border-slate-200 p-3"><div className="text-xs font-medium text-slate-700">Confirmation</div><div className="text-sm text-slate-700 mt-1 whitespace-pre-wrap">{s.confirmation || <span className="text-slate-400">—</span>}</div></div>
+                    <div className="rounded-xl bg-muted/50 border border-border p-3"><div className="text-xs font-medium text-foreground/80">Trigger</div><div className="text-sm text-foreground/70 mt-1 whitespace-pre-wrap">{s.trigger || <span className="text-muted-foreground">—</span>}</div></div>
+                    <div className="rounded-xl bg-muted/50 border border-border p-3"><div className="text-xs font-medium text-foreground/80">Confirmation</div><div className="text-sm text-foreground/70 mt-1 whitespace-pre-wrap">{s.confirmation || <span className="text-muted-foreground">—</span>}</div></div>
                 </div>
                 {s.exampleImages?.length ? (
                     <div>
-                        <div className="text-xs font-medium text-slate-700 mb-2">Example Screenshots</div>
+                        <div className="text-xs font-medium text-foreground/80 mb-2">Example Screenshots</div>
                         <div className="flex gap-2 overflow-x-auto pb-2">
-                            {s.exampleImages.map((url) => (<img key={url} src={url} alt="Example" className="h-24 w-36 object-cover rounded-xl border border-slate-200 cursor-pointer hover:opacity-80 transition" onClick={() => window.open(url, "_blank")} />))}
+                            {s.exampleImages.map((url) => (<img key={url} src={url} alt="Example" className="h-24 w-36 object-cover rounded-xl border border-border cursor-pointer hover:opacity-80 transition" onClick={() => window.open(url, "_blank")} />))}
                         </div>
                     </div>
                 ) : null}
-                {s.tags?.length ? <div className="flex flex-wrap gap-2">{s.tags.map((t) => (<span key={t} className="text-xs px-2 py-1 rounded-full bg-white border border-slate-200 text-slate-700">#{t}</span>))}</div> : null}
+                {s.tags?.length ? <div className="flex flex-wrap gap-2">{s.tags.map((t) => (<span key={t} className="text-xs px-2 py-1 rounded-full bg-card border border-border text-foreground/80">#{t}</span>))}</div> : null}
                 <Separator />
                 <div className="flex flex-wrap gap-2">
                     <Button variant="outline" size="sm" onClick={() => onEdit(s)}>Edit</Button>
@@ -380,22 +380,22 @@ export default function TradeJournal() {
     const handleUpdateCurrency = async (cur: string) => { await updateCurrency(cur || "$"); };
 
     return (
-        <div className="min-h-screen bg-slate-50"><div className="max-w-6xl mx-auto px-4 py-8">
+        <div className="min-h-screen bg-background"><div className="max-w-6xl mx-auto px-4 py-8">
             <TopBar currency={currency} onCurrency={handleUpdateCurrency} onExport={exportJSON} onImport={importJSON} onWipe={handleWipe} />
-            {loading ? <div className="py-10 text-center text-slate-500 flex flex-col items-center gap-2"><Loader2 className="w-8 h-8 animate-spin text-slate-400" /> Connecting to Supabase...</div> : (
+            {loading ? <div className="py-10 text-center text-muted-foreground flex flex-col items-center gap-2"><Loader2 className="w-8 h-8 animate-spin text-muted-foreground" /> Connecting to Supabase...</div> : (
                 <>
                     <div className="mt-6"><StatsStrip entries={entries} currency={currency} /></div>
                     <div className="mt-6"><Tabs defaultValue="journal">
                         <TabsList className="rounded-2xl"><TabsTrigger value="journal" className="gap-2"><BookOpen className="w-4 h-4" />Journal</TabsTrigger><TabsTrigger value="strategies" className="gap-2"><TrendingUp className="w-4 h-4" />Strategies</TabsTrigger></TabsList>
                         <TabsContent value="journal" className="mt-4"><Card className="rounded-2xl"><CardHeader className="pb-3">
-                            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between"><div><CardTitle className="text-base">Trade entries</CardTitle><div className="text-sm text-slate-600">Search anything: market, tags, what you saw, what worked…</div></div>
+                            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between"><div><CardTitle className="text-base">Trade entries</CardTitle><div className="text-sm text-muted-foreground">Search anything: market, tags, what you saw, what worked…</div></div>
                                 <div className="flex flex-wrap gap-2"><Dialog open={tradeDialogOpen} onOpenChange={(v) => { setTradeDialogOpen(v); if (!v) setEditingEntry(null); }}>
                                     <DialogTrigger asChild><Button className="gap-2"><Plus className="w-4 h-4" />New trade</Button></DialogTrigger>
                                     <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle>{editingEntry ? "Edit trade" : "New trade"}</DialogTitle></DialogHeader>
                                         <EntryForm strategies={strategies} currency={currency} initial={editingEntry} onSave={handleSaveEntry} onCancel={() => { setTradeDialogOpen(false); setEditingEntry(null); }} /></DialogContent></Dialog></div></div>
                         </CardHeader><CardContent className="grid gap-4">
                                 <div className="grid md:grid-cols-12 gap-3">
-                                    <div className="md:col-span-5"><div className="relative"><Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" /><Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search trades, tags, notes, strategies…" className="pl-9" /></div></div>
+                                    <div className="md:col-span-5"><div className="relative"><Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" /><Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search trades, tags, notes, strategies…" className="pl-9" /></div></div>
                                     <div className="md:col-span-2"><Select value={filterOutcome} onValueChange={setFilterOutcome}><SelectTrigger><SelectValue placeholder="Outcome" /></SelectTrigger><SelectContent><SelectItem value="all">All outcomes</SelectItem><SelectItem value="Win">Win</SelectItem><SelectItem value="Loss">Loss</SelectItem><SelectItem value="BE">Break-even</SelectItem></SelectContent></Select></div>
                                     <div className="md:col-span-2"><Select value={filterType} onValueChange={setFilterType}><SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger><SelectContent><SelectItem value="all">All types</SelectItem><SelectItem value="R_F">Rise/Fall</SelectItem><SelectItem value="TOUCHED">Touched</SelectItem></SelectContent></Select></div>
                                     <div className="md:col-span-3"><Select value={filterStrategy} onValueChange={setFilterStrategy}><SelectTrigger><SelectValue placeholder="Strategy" /></SelectTrigger><SelectContent><SelectItem value="all">All strategies</SelectItem><SelectItem value="none">No strategy</SelectItem>{strategies.slice().sort((a, b) => Number(b.isTop) - Number(a.isTop) || a.name.localeCompare(b.name)).map((s) => (<SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>))}</SelectContent></Select></div>
@@ -404,14 +404,14 @@ export default function TradeJournal() {
                                 </div>
                                 {filteredEntries.length ? (
                                     viewMode === "table" ? (
-                                        <div className="rounded-2xl border border-slate-200 overflow-hidden bg-white"><div className="overflow-x-auto"><table className="w-full text-sm">
-                                            <thead className="bg-slate-50 border-b border-slate-200"><tr className="text-left text-xs text-slate-600">
+                                        <div className="rounded-2xl border border-border overflow-hidden bg-card"><div className="overflow-x-auto"><table className="w-full text-sm">
+                                            <thead className="bg-muted/50 border-b border-border"><tr className="text-left text-xs text-muted-foreground">
                                                 <th className="p-3">Date</th><th className="p-3">Type</th><th className="p-3">Market</th><th className="p-3">TF</th><th className="p-3">Dir</th><th className="p-3">Stake</th><th className="p-3">Payout</th><th className="p-3">Outcome</th><th className="p-3">P/L</th><th className="p-3">Strategy</th><th className="p-3">Conf.</th><th className="p-3"></th>
                                             </tr></thead>
                                             <tbody>{filteredEntries.map((e) => {
                                                 const strat = e.strategyId ? strategyById.get(e.strategyId) : null;
-                                                return (<tr key={e.id} className="border-b border-slate-100 hover:bg-slate-50">
-                                                    <td className="p-3 text-slate-700 whitespace-nowrap">{smallDate(e.entryTimeISO)}</td><td className="p-3"><Pill>{e.tradeType === "TOUCHED" ? "Touched" : "Rise/Fall"}</Pill></td><td className="p-3 text-slate-700">{e.market || "—"}</td><td className="p-3 text-slate-700">{e.timeframe || "—"}</td><td className="p-3 text-slate-700">{e.tradeType === "TOUCHED" ? "—" : e.direction}</td><td className="p-3 text-slate-700 whitespace-nowrap">{formatMoney(e.stake, currency)}</td><td className="p-3 text-slate-700 whitespace-nowrap">{formatMoney(e.payout, currency)}</td><td className="p-3"><Badge variant={e.outcome === "Win" ? "default" : e.outcome === "Loss" ? "destructive" : "secondary"}>{e.outcome}</Badge></td><td className={`p-3 whitespace-nowrap font-medium ${statColorClass(e.profit)}`}>{formatMoney(e.profit, currency)}</td><td className="p-3 text-slate-700">{strat ? strat.name : "—"}</td><td className="p-3"><Stars value={e.confidence || 0} /></td><td className="p-3"><div className="flex gap-2 justify-end"><Button variant="outline" size="sm" onClick={() => { setEditingEntry(e); setTradeDialogOpen(true); }}>Edit</Button><Button variant="destructive" size="sm" onClick={() => handleDeleteEntry(e.id)}>Delete</Button></div></td>
+                                                return (<tr key={e.id} className="border-b border-border hover:bg-muted/30">
+                                                    <td className="p-3 text-foreground/80 whitespace-nowrap">{smallDate(e.entryTimeISO)}</td><td className="p-3"><Pill>{e.tradeType === "TOUCHED" ? "Touched" : "Rise/Fall"}</Pill></td><td className="p-3 text-foreground/80">{e.market || "—"}</td><td className="p-3 text-foreground/80">{e.timeframe || "—"}</td><td className="p-3 text-foreground/80">{e.tradeType === "TOUCHED" ? "—" : e.direction}</td><td className="p-3 text-foreground/80 whitespace-nowrap">{formatMoney(e.stake, currency)}</td><td className="p-3 text-foreground/80 whitespace-nowrap">{formatMoney(e.payout, currency)}</td><td className="p-3"><Badge variant={e.outcome === "Win" ? "default" : e.outcome === "Loss" ? "destructive" : "secondary"}>{e.outcome}</Badge></td><td className={`p-3 whitespace-nowrap font-medium ${statColorClass(e.profit)}`}>{formatMoney(e.profit, currency)}</td><td className="p-3 text-foreground/80">{strat ? strat.name : "—"}</td><td className="p-3"><Stars value={e.confidence || 0} /></td><td className="p-3"><div className="flex gap-2 justify-end"><Button variant="outline" size="sm" onClick={() => { setEditingEntry(e); setTradeDialogOpen(true); }}>Edit</Button><Button variant="destructive" size="sm" onClick={() => handleDeleteEntry(e.id)}>Delete</Button></div></td>
                                                 </tr>);
                                             })}</tbody></table></div></div>
                                     ) : (<div className="grid gap-4">{filteredEntries.map((e) => (<TradeRow key={e.id} entry={e} strategy={e.strategyId ? strategyById.get(e.strategyId) : null} currency={currency} onEdit={(entry) => { setEditingEntry(entry); setTradeDialogOpen(true); }} onDelete={handleDeleteEntry} />))}</div>)
@@ -419,7 +419,7 @@ export default function TradeJournal() {
                             </CardContent></Card></TabsContent>
                         <TabsContent value="strategies" className="mt-4"><div className="grid lg:grid-cols-3 gap-4">
                             <div className="lg:col-span-2"><Card className="rounded-2xl"><CardHeader className="pb-3">
-                                <div className="flex items-center justify-between gap-3"><div><CardTitle className="text-base">Strategy Library</CardTitle><div className="text-sm text-slate-600">Turn your best observations into repeatable rules.</div></div>
+                                <div className="flex items-center justify-between gap-3"><div><CardTitle className="text-base">Strategy Library</CardTitle><div className="text-sm text-muted-foreground">Turn your best observations into repeatable rules.</div></div>
                                     <Dialog open={strategyDialogOpen} onOpenChange={(v) => { setStrategyDialogOpen(v); if (!v) setEditingStrategy(null); }}>
                                         <DialogTrigger asChild><Button className="gap-2"><Plus className="w-4 h-4" />New strategy</Button></DialogTrigger>
                                         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle>{editingStrategy ? "Edit strategy" : "New strategy"}</DialogTitle></DialogHeader>
@@ -429,16 +429,16 @@ export default function TradeJournal() {
                                         : (<EmptyState title="No strategies yet" hint="Your best trading future is usually hidden inside your past trades. Capture it." action={<Button onClick={() => setStrategyDialogOpen(true)} className="gap-2"><Plus className="w-4 h-4" />Create a strategy</Button>} />)}
                                 </CardContent></Card></div>
                             <div className="lg:col-span-1"><Card className="rounded-2xl"><CardHeader className="pb-3"><CardTitle className="text-base">How to use this</CardTitle></CardHeader>
-                                <CardContent className="grid gap-3 text-sm text-slate-700">
-                                    <div className="rounded-2xl border border-slate-200 bg-white p-4"><div className="font-semibold">1) Journal like a scientist</div><div className="mt-1 text-slate-600">Write what you saw, what you expected, what actually happened.</div></div>
-                                    <div className="rounded-2xl border border-slate-200 bg-white p-4"><div className="font-semibold">2) Promote patterns into strategies</div><div className="mt-1 text-slate-600">When something repeats, move it into the Strategy Library.</div></div>
-                                    <div className="rounded-2xl border border-slate-200 bg-white p-4"><div className="font-semibold">3) Link trades to strategies</div><div className="mt-1 text-slate-600">So later you can see which strategy is truly paying.</div></div>
-                                    <div className="rounded-2xl border border-slate-200 bg-white p-4"><div className="font-semibold">4) Protect your data</div><div className="mt-1 text-slate-600">Use Export sometimes. Import restores it on any device.</div></div>
-                                    <Separator /><div className="text-xs text-slate-500 flex items-center gap-2"><CloudCheck className="w-4 h-4 text-emerald-500" /> Cloud Sync Active. Data is saved to your Supabase account securely.</div>
+                                <CardContent className="grid gap-3 text-sm">
+                                    <div className="rounded-2xl border border-border bg-card p-4"><div className="font-semibold">1) Journal like a scientist</div><div className="mt-1 text-muted-foreground">Write what you saw, what you expected, what actually happened.</div></div>
+                                    <div className="rounded-2xl border border-border bg-card p-4"><div className="font-semibold">2) Promote patterns into strategies</div><div className="mt-1 text-muted-foreground">When something repeats, move it into the Strategy Library.</div></div>
+                                    <div className="rounded-2xl border border-border bg-card p-4"><div className="font-semibold">3) Link trades to strategies</div><div className="mt-1 text-muted-foreground">So later you can see which strategy is truly paying.</div></div>
+                                    <div className="rounded-2xl border border-border bg-card p-4"><div className="font-semibold">4) Protect your data</div><div className="mt-1 text-muted-foreground">Use Export sometimes. Import restores it on any device.</div></div>
+                                    <Separator /><div className="text-xs text-muted-foreground flex items-center gap-2"><CloudCheck className="w-4 h-4 text-emerald-500" /> Cloud Sync Active. Data is saved to your Supabase account securely.</div>
                                 </CardContent></Card></div>
                         </div></TabsContent>
                     </Tabs></div>
-                    <div className="mt-8 text-xs text-slate-500">Tip: the best journals are simple. Keep your entries short but precise, then review weekly and promote only what repeats.</div>
+                    <div className="mt-8 text-xs text-muted-foreground">Tip: the best journals are simple. Keep your entries short but precise, then review weekly and promote only what repeats.</div>
                 </>
             )}
         </div></div>
